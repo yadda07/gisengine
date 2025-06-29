@@ -7,6 +7,7 @@ FME-style nodes with modern design
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
+import math
 
 class ConnectionPort(QGraphicsEllipseItem):
     """Port de connexion professionnel pour les nœuds"""
@@ -52,10 +53,12 @@ class ConnectionPort(QGraphicsEllipseItem):
     
     def mousePressEvent(self, event):
         """Début de création de connexion"""
-        if event.button() == Qt.LeftButton and self.port_type == "output":
+        if event.button() == Qt.LeftButton:
             scene = self.scene()
-            if hasattr(scene, 'start_connection'):
-                scene.start_connection(self)
+            if hasattr(scene, 'handle_port_click'):
+                scene.handle_port_click(self)
+                event.accept()
+                return
         super().mousePressEvent(event)
     
     def add_connection(self, connection):
@@ -93,36 +96,94 @@ class Connection(QGraphicsPathItem):
     
     def update_path(self):
         """Met à jour le chemin de la connexion courbe"""
+        if not self.start_port or not self.end_port:
+            return
+            
+        # Positions absolues des centres des ports
         start_pos = self.start_port.scenePos() + self.start_port.boundingRect().center()
         end_pos = self.end_port.scenePos() + self.end_port.boundingRect().center()
         
         path = QPainterPath()
         path.moveTo(start_pos)
         
-        # Calcul des points de contrôle pour une courbe de Bézier
+        # Calcul des points de contrôle pour une courbe de Bézier fluide
         dx = end_pos.x() - start_pos.x()
-        dy = end_pos.y() - start_pos.y()
+        distance = abs(dx)
         
-        ctrl1 = QPointF(start_pos.x() + dx * 0.5, start_pos.y())
-        ctrl2 = QPointF(end_pos.x() - dx * 0.5, end_pos.y())
+        # Contrôle adaptatif de la courbure selon la distance
+        control_offset = max(50, min(distance * 0.6, 200))
+        
+        ctrl1 = QPointF(start_pos.x() + control_offset, start_pos.y())
+        ctrl2 = QPointF(end_pos.x() - control_offset, end_pos.y())
         
         path.cubicTo(ctrl1, ctrl2, end_pos)
         self.setPath(path)
+        
+        # Mettre à jour la zone de collision
+        self.prepareGeometryChange()
     
     def paint(self, painter, option, widget):
         """Rendu personnalisé de la connexion"""
+        painter.setRenderHint(QPainter.Antialiasing, True)
+        
+        # Ombre portée pour plus de profondeur
+        shadow_pen = QPen(QColor(0, 0, 0, 30), 4)
+        painter.setPen(shadow_pen)
+        shadow_path = self.path()
+        shadow_path.translate(2, 2)
+        painter.drawPath(shadow_path)
+        
+        # Connexion principale
         if self.isSelected():
             painter.setPen(self.pen_selected)
         else:
             painter.setPen(self.pen)
         
-        painter.setRenderHint(QPainter.Antialiasing)
         painter.drawPath(self.path())
+        
+        # Flèche directionnelle au milieu
+        self.draw_arrow(painter)
+    
+    def draw_arrow(self, painter):
+        """Dessiner une flèche directionnelle sur la connexion"""
+        if not self.path().elementCount():
+            return
+            
+        # Point au milieu de la courbe (approximatif)
+        percent = 0.5
+        point = self.path().pointAtPercent(percent)
+        
+        # Direction de la tangente
+        angle_percent = 0.51  # Légèrement après le milieu pour la direction
+        next_point = self.path().pointAtPercent(angle_percent)
+        
+        # Calculer l'angle
+        dx = next_point.x() - point.x()
+        dy = next_point.y() - point.y()
+        angle = math.atan2(dy, dx)
+        
+        # Dessiner la flèche
+        arrow_size = 8
+        arrow_head = QPainterPath()
+        arrow_head.moveTo(point.x(), point.y())
+        arrow_head.lineTo(
+            point.x() - arrow_size * math.cos(angle - math.pi/6),
+            point.y() - arrow_size * math.sin(angle - math.pi/6)
+        )
+        arrow_head.moveTo(point.x(), point.y())
+        arrow_head.lineTo(
+            point.x() - arrow_size * math.cos(angle + math.pi/6),
+            point.y() - arrow_size * math.sin(angle + math.pi/6)
+        )
+        
+        painter.drawPath(arrow_head)
     
     def remove_from_scene(self):
         """Suppression propre de la connexion"""
-        self.start_port.remove_connection(self)
-        self.end_port.remove_connection(self)
+        if self.start_port:
+            self.start_port.remove_connection(self)
+        if self.end_port:
+            self.end_port.remove_connection(self)
         if self.scene():
             self.scene().removeItem(self)
 

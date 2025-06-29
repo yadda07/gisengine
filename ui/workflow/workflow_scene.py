@@ -22,6 +22,7 @@ class FMEStyleScene(QGraphicsScene):
         # État de connexion
         self.temp_connection = None
         self.connection_start_port = None
+        self.is_connecting = False
         
         # Grille
         self.grid_size = 20
@@ -78,46 +79,86 @@ class FMEStyleScene(QGraphicsScene):
         
         return node
     
+    def handle_port_click(self, port):
+        """Gérer le clic sur un port"""
+        if not self.is_connecting:
+            # Commencer une nouvelle connexion depuis un port de sortie
+            if port.port_type == "output":
+                self.start_connection(port)
+        else:
+            # Terminer la connexion sur un port d'entrée
+            if port.port_type == "input" and self.connection_start_port:
+                self.finish_connection(port)
+            else:
+                # Annuler si on clique sur un mauvais type de port
+                self.cleanup_temp_connection()
+    
     def start_connection(self, start_port):
         """Commencer une nouvelle connexion"""
         self.connection_start_port = start_port
+        self.is_connecting = True
         
-        # Créer une connexion temporaire
-        self.temp_connection = QGraphicsLineItem()
-        self.temp_connection.setPen(QPen(QColor("#007bff"), 2, Qt.DashLine))
+        # Créer une connexion temporaire curviligne
+        self.temp_connection = QGraphicsPathItem()
+        pen = QPen(QColor("#007bff"), 2, Qt.DashLine)
+        pen.setCapStyle(Qt.RoundCap)
+        self.temp_connection.setPen(pen)
         self.addItem(self.temp_connection)
         
-        # Position de départ
-        start_pos = start_port.scenePos() + start_port.boundingRect().center()
-        self.temp_connection.setLine(start_pos.x(), start_pos.y(), start_pos.x(), start_pos.y())
+        # Mettre à jour le curseur
+        self.views()[0].setCursor(Qt.CrossCursor) if self.views() else None
+    
+    def finish_connection(self, end_port):
+        """Terminer la connexion"""
+        if self.can_connect(self.connection_start_port, end_port):
+            # Créer la connexion finale
+            connection = Connection(self.connection_start_port, end_port)
+            self.addItem(connection)
+        
+        self.cleanup_temp_connection()
     
     def mouseMoveEvent(self, event):
         """Gestion du mouvement de souris pour les connexions temporaires"""
-        if self.temp_connection and self.connection_start_port:
-            start_pos = self.connection_start_port.scenePos() + self.connection_start_port.boundingRect().center()
-            end_pos = event.scenePos()
-            self.temp_connection.setLine(start_pos.x(), start_pos.y(), end_pos.x(), end_pos.y())
+        if self.temp_connection and self.connection_start_port and self.is_connecting:
+            self.update_temp_connection(event.scenePos())
         
         super().mouseMoveEvent(event)
+    
+    def update_temp_connection(self, end_pos):
+        """Mettre à jour la connexion temporaire avec une courbe"""
+        if not self.temp_connection or not self.connection_start_port:
+            return
+            
+        start_pos = self.connection_start_port.scenePos() + self.connection_start_port.boundingRect().center()
+        
+        # Créer un chemin courbe temporaire
+        path = QPainterPath()
+        path.moveTo(start_pos)
+        
+        # Calcul des points de contrôle
+        dx = end_pos.x() - start_pos.x()
+        distance = abs(dx)
+        control_offset = max(50, min(distance * 0.6, 200))
+        
+        ctrl1 = QPointF(start_pos.x() + control_offset, start_pos.y())
+        ctrl2 = QPointF(end_pos.x() - control_offset, end_pos.y())
+        
+        path.cubicTo(ctrl1, ctrl2, end_pos)
+        self.temp_connection.setPath(path)
     
     def mousePressEvent(self, event):
         """Gestion des clics pour finaliser les connexions"""
         if event.button() == Qt.LeftButton:
             item = self.itemAt(event.scenePos(), QTransform())
             
-            # Vérifier si on clique sur un port d'entrée
-            if hasattr(item, 'port_type') and item.port_type == "input" and self.connection_start_port:
-                if self.can_connect(self.connection_start_port, item):
-                    # Créer la connexion finale
-                    connection = Connection(self.connection_start_port, item)
-                    self.addItem(connection)
-                
-                # Nettoyer la connexion temporaire
+            # Si on est en train de connecter et qu'on clique dans le vide
+            if self.is_connecting and not hasattr(item, 'port_type'):
                 self.cleanup_temp_connection()
-            
-            elif event.button() == Qt.RightButton or not item:
-                # Annuler la connexion temporaire
-                self.cleanup_temp_connection()
+                return
+        
+        elif event.button() == Qt.RightButton:
+            # Annuler la connexion temporaire avec clic droit
+            self.cleanup_temp_connection()
         
         super().mousePressEvent(event)
     
@@ -147,6 +188,11 @@ class FMEStyleScene(QGraphicsScene):
             self.removeItem(self.temp_connection)
             self.temp_connection = None
         self.connection_start_port = None
+        self.is_connecting = False
+        
+        # Restaurer le curseur normal
+        if self.views():
+            self.views()[0].setCursor(Qt.ArrowCursor)
     
     def keyPressEvent(self, event):
         """Gestion des raccourcis clavier"""
