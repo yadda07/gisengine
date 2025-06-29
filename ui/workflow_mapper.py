@@ -1,50 +1,381 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Workflow Mapper Avancé - Interface GISENGINE pour QGIS
-Version complète avec fonctionnalités étendues
+GISEngine Workflow Mapper - Modern FME-Style Interface
+Interface de création de workflows visuels moderne avec drag & drop fluide
 """
 
-import sys
-import json
-import random
-import datetime
-from typing import List, Dict, Optional, Tuple
-from dataclasses import dataclass, field
-
-from PyQt5.QtWidgets import (
-    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QGraphicsView, QGraphicsScene, QGraphicsItem, QGraphicsRectItem,
-    QGraphicsEllipseItem, QGraphicsTextItem, QGraphicsProxyWidget,
-    QPushButton, QLabel, QListWidget, QListWidgetItem, QComboBox,
-    QTableWidget, QTableWidgetItem, QSplitter, QGroupBox, QLineEdit,
-    QCheckBox, QSpinBox, QTabWidget, QTextEdit, QScrollArea, QSlider,
-    QProgressBar, QMenuBar, QMenu, QAction, QToolBar, QStatusBar,
-    QFileDialog, QMessageBox, QDialog, QDialogButtonBox, QFormLayout,
-    QTreeWidget, QTreeWidgetItem, QHeaderView, QFrame, QDoubleSpinBox
-)
 from PyQt5.QtCore import (
-    Qt, QRectF, QPointF, QSizeF, pyqtSignal, QTimer, QThread,
-    QPropertyAnimation, QEasingCurve, QRect, QSize
+    Qt, QTimer, QPointF, pyqtSignal, QRectF, QPropertyAnimation, QEasingCurve,
+    QObject, QEvent, QMimeData, QSizeF, QRect, QSize, QStringListModel
 )
 from PyQt5.QtGui import (
-    QPen, QBrush, QColor, QFont, QPainter, QPainterPath,
-    QLinearGradient, QPolygonF, QPixmap, QIcon, QCursor,
-    QKeySequence, QTransform, QPalette
+    QPen, QBrush, QColor, QFont, QPainter, QLinearGradient, QPainterPath,
+    QPixmap, QIcon, QDrag, QPalette, QFontMetrics, QKeySequence
 )
+from PyQt5.QtWidgets import (
+    QGraphicsScene, QGraphicsView, QGraphicsItem, QGraphicsRectItem,
+    QGraphicsEllipseItem, QGraphicsTextItem, QDialog, QVBoxLayout,
+    QHBoxLayout, QFormLayout, QTabWidget, QWidget, QLineEdit, QTextEdit,
+    QTableWidget, QTableWidgetItem, QDialogButtonBox, QLabel, QTransform,
+    QCompleter, QListWidget, QListWidgetItem, QFrame, QPushButton,
+    QScrollArea, QSplitter, QGroupBox, QCheckBox, QSlider, QSpinBox,
+    QApplication, QGraphicsDropShadowEffect, QGraphicsProxyWidget,
+    QMainWindow, QShortcut, QMenu, QAction
+)
+import random
+import json
+from typing import List, Dict, Optional, Any
 
-@dataclass
-class TransformerConfig:
-    """Configuration d'un transformer"""
-    id: str
-    name: str
-    category: str
-    description: str
-    icon: str
-    input_types: List[str] = field(default_factory=list)
-    output_types: List[str] = field(default_factory=list)
-    parameters: Dict = field(default_factory=dict)
-    color: str = "#4A90E2"
+# === DONNÉES DES NŒUDS STYLE FME ===
+
+WORKFLOW_NODES = {
+    "readers": [
+        {"name": "Shapefile Reader", "category": "Spatial Readers", "icon": "📁", "color": "#28a745", "keywords": ["shp", "shapefile", "esri"]},
+        {"name": "GeoJSON Reader", "category": "Spatial Readers", "icon": "🗺️", "color": "#28a745", "keywords": ["geojson", "json", "web"]},
+        {"name": "CSV Reader", "category": "Table Readers", "icon": "📊", "color": "#28a745", "keywords": ["csv", "table", "data"]},
+        {"name": "PostGIS Reader", "category": "Database Readers", "icon": "🗄️", "color": "#28a745", "keywords": ["postgis", "postgresql", "db"]},
+        {"name": "WFS Reader", "category": "Web Readers", "icon": "🌐", "color": "#28a745", "keywords": ["wfs", "web", "service"]},
+    ],
+    "transformers": [
+        {"name": "Buffer", "category": "Vector Geometry", "icon": "⭕", "color": "#FF9800", "keywords": ["buffer", "zone", "distance"]},
+        {"name": "Clip", "category": "Vector Overlay", "icon": "✂️", "color": "#FF9800", "keywords": ["clip", "cut", "overlay"]},
+        {"name": "Dissolve", "category": "Vector Geometry", "icon": "🔗", "color": "#FF9800", "keywords": ["dissolve", "merge", "combine"]},
+        {"name": "Reproject", "category": "Coordinate System", "icon": "🌍", "color": "#FF9800", "keywords": ["reproject", "crs", "transform"]},
+        {"name": "Intersect", "category": "Vector Overlay", "icon": "⚡", "color": "#FF9800", "keywords": ["intersect", "overlap", "spatial"]},
+        {"name": "Join", "category": "Vector Table", "icon": "🔗", "color": "#FF9800", "keywords": ["join", "merge", "attribute"]},
+        {"name": "Filter", "category": "Data Processing", "icon": "🔍", "color": "#FF9800", "keywords": ["filter", "select", "where"]},
+        {"name": "Calculate Field", "category": "Attributes", "icon": "🧮", "color": "#FF9800", "keywords": ["calculate", "field", "expression"]},
+    ],
+    "writers": [
+        {"name": "Shapefile Writer", "category": "Spatial Writers", "icon": "💾", "color": "#2196F3", "keywords": ["shp", "shapefile", "esri"]},
+        {"name": "GeoJSON Writer", "category": "Spatial Writers", "icon": "📤", "color": "#2196F3", "keywords": ["geojson", "json", "web"]},
+        {"name": "CSV Writer", "category": "Table Writers", "icon": "📋", "color": "#2196F3", "keywords": ["csv", "table", "export"]},
+        {"name": "PostGIS Writer", "category": "Database Writers", "icon": "🗃️", "color": "#2196F3", "keywords": ["postgis", "postgresql", "db"]},
+    ]
+}
+
+# === CLASSES MODERNES STYLE FME ===
+
+class ModernWorkflowNode(QGraphicsRectItem):
+    """Nœud de workflow moderne style FME"""
+    
+    def __init__(self, node_data, x=0, y=0):
+        super().__init__(0, 0, 200, 80)
+        self.setPos(x, y)
+        self.node_data = node_data
+        self.input_ports = []
+        self.output_ports = []
+        self.is_selected = False
+        
+        self.setFlag(QGraphicsItem.ItemIsMovable, True)
+        self.setFlag(QGraphicsItem.ItemIsSelectable, True)
+        self.setFlag(QGraphicsItem.ItemSendsGeometryChanges, True)
+        
+        self.setup_appearance()
+        self.create_content()
+        self.create_ports()
+        
+    def setup_appearance(self):
+        """Style moderne avec dégradés"""
+        color = QColor(self.node_data["color"])
+        
+        # Dégradé moderne
+        gradient = QLinearGradient(0, 0, 0, 80)
+        gradient.setColorAt(0, color.lighter(120))
+        gradient.setColorAt(1, color.darker(110))
+        
+        self.setBrush(QBrush(gradient))
+        self.setPen(QPen(color.darker(150), 2))
+        
+    def create_content(self):
+        """Contenu visuel du nœud"""
+        # Icône
+        self.icon_item = QGraphicsTextItem(self.node_data["icon"], self)
+        self.icon_item.setPos(8, 8)
+        self.icon_item.setFont(QFont("Arial", 14))
+        
+        # Nom
+        self.name_item = QGraphicsTextItem(self.node_data["name"], self)
+        self.name_item.setPos(35, 5)
+        font = QFont("Arial", 10, QFont.Bold)
+        self.name_item.setFont(font)
+        self.name_item.setDefaultTextColor(QColor("white"))
+        
+        # Catégorie
+        self.category_item = QGraphicsTextItem(self.node_data["category"], self)
+        self.category_item.setPos(8, 45)
+        self.category_item.setFont(QFont("Arial", 8))
+        self.category_item.setDefaultTextColor(QColor("#f8f9fa"))
+        
+    def create_ports(self):
+        """Créer les ports selon le type de nœud"""
+        node_name = self.node_data["name"].lower()
+        
+        # Readers : sortie seulement
+        if "reader" in node_name:
+            port = ConnectionPort(-7, 40, "output", "vector", self)
+            port.setParentItem(self)
+            self.output_ports.append(port)
+            
+        # Writers : entrée seulement
+        elif "writer" in node_name:
+            port = ConnectionPort(-7, 40, "input", "vector", self)
+            port.setParentItem(self)
+            self.input_ports.append(port)
+            
+        # Transformers : entrée et sortie
+        else:
+            in_port = ConnectionPort(-7, 40, "input", "vector", self)
+            in_port.setParentItem(self)
+            self.input_ports.append(in_port)
+            
+            out_port = ConnectionPort(193, 40, "output", "vector", self)
+            out_port.setParentItem(self)
+            self.output_ports.append(out_port)
+    
+    def mousePressEvent(self, event):
+        """Gestion de la sélection"""
+        if event.button() == Qt.LeftButton:
+            self.is_selected = True
+            self.update()
+        super().mousePressEvent(event)
+        
+    def mouseDoubleClickEvent(self, event):
+        """Double-clic pour configurer"""
+        if event.button() == Qt.LeftButton:
+            self.configure_node()
+            
+    def configure_node(self):
+        """Ouvre la configuration du nœud"""
+        from PyQt5.QtWidgets import QDialog, QVBoxLayout, QLabel, QPushButton
+        
+        dialog = QDialog()
+        dialog.setWindowTitle(f"Configuration - {self.node_data['name']}")
+        dialog.setFixedSize(300, 200)
+        
+        layout = QVBoxLayout()
+        layout.addWidget(QLabel(f"Nœud: {self.node_data['name']}"))
+        layout.addWidget(QLabel(f"Catégorie: {self.node_data['category']}"))
+        
+        close_btn = QPushButton("Fermer")
+        close_btn.clicked.connect(dialog.accept)
+        layout.addWidget(close_btn)
+        
+        dialog.setLayout(layout)
+        dialog.exec_()
+
+class ModernWorkflowScene(QGraphicsScene):
+    """Scène moderne avec grille et interactions fluides"""
+    
+    node_added = pyqtSignal(object)
+    connection_created = pyqtSignal(object, object)
+    
+    def __init__(self):
+        super().__init__()
+        self.setSceneRect(-2000, -2000, 4000, 3000)
+        self.grid_size = 20
+        self.show_grid = True
+        self.temp_connection = None
+        self.connection_start_port = None
+        
+    def drawBackground(self, painter, rect):
+        """Dessine la grille de fond"""
+        if not self.show_grid:
+            painter.fillRect(rect, QBrush(QColor("#2b2b2b")))
+            return
+            
+        # Fond sombre
+        painter.fillRect(rect, QBrush(QColor("#2b2b2b")))
+        
+        # Grille
+        painter.setPen(QPen(QColor("#404040"), 1))
+        
+        # Lignes verticales
+        start_x = int(rect.left() // self.grid_size) * self.grid_size
+        while start_x < rect.right():
+            painter.drawLine(start_x, rect.top(), start_x, rect.bottom())
+            start_x += self.grid_size
+            
+        # Lignes horizontales  
+        start_y = int(rect.top() // self.grid_size) * self.grid_size
+        while start_y < rect.bottom():
+            painter.drawLine(rect.left(), start_y, rect.right(), start_y)
+            start_y += self.grid_size
+            
+    def add_node_from_data(self, node_data, position):
+        """Ajoute un nœud à partir des données"""
+        node = ModernWorkflowNode(node_data, position.x(), position.y())
+        self.addItem(node)
+        self.node_added.emit(node)
+        return node
+        
+    def start_connection(self, port):
+        """Démarre la création d'une connexion"""
+        self.connection_start_port = port
+        
+    def mouseMoveEvent(self, event):
+        """Gestion du drag & drop et connexions temporaires"""
+        if self.connection_start_port:
+            # Dessiner ligne temporaire
+            if self.temp_connection:
+                self.removeItem(self.temp_connection)
+                
+            start_pos = self.connection_start_port.scenePos() + QPointF(7, 7)
+            end_pos = event.scenePos()
+            
+            self.temp_connection = QGraphicsLineItem(start_pos.x(), start_pos.y(), 
+                                                   end_pos.x(), end_pos.y())
+            self.temp_connection.setPen(QPen(QColor("#ffc107"), 2, Qt.DashLine))
+            self.addItem(self.temp_connection)
+            
+        super().mouseMoveEvent(event)
+        
+    def mouseReleaseEvent(self, event):
+        """Fin de création de connexion"""
+        if self.temp_connection:
+            self.removeItem(self.temp_connection)
+            self.temp_connection = None
+            
+        if self.connection_start_port:
+            # Chercher un port de destination
+            item = self.itemAt(event.scenePos(), QTransform())
+            if isinstance(item, ConnectionPort) and item != self.connection_start_port:
+                if self.connection_start_port.can_connect_to(item):
+                    connection = Connection(self.connection_start_port, item)
+                    self.addItem(connection)
+                    self.connection_created.emit(self.connection_start_port, item)
+                    
+            self.connection_start_port = None
+            
+        super().mouseReleaseEvent(event)
+        
+    def toggle_grid(self):
+        """Active/désactive la grille"""
+        self.show_grid = not self.show_grid
+        self.update()
+
+class NodeSearchPanel(QWidget):
+    """Panneau de recherche et sélection de nœuds avec auto-complétion"""
+    
+    node_requested = pyqtSignal(dict)
+    
+    def __init__(self):
+        super().__init__()
+        self.init_ui()
+        self.setup_search()
+        
+    def init_ui(self):
+        """Interface du panneau"""
+        layout = QVBoxLayout()
+        
+        # Titre
+        title = QLabel("📚 Node Library")
+        title.setFont(QFont("Arial", 12, QFont.Bold))
+        title.setStyleSheet("color: white; padding: 10px;")
+        layout.addWidget(title)
+        
+        # Barre de recherche
+        self.search_box = QLineEdit()
+        self.search_box.setPlaceholderText("🔍 Search nodes...")
+        self.search_box.setStyleSheet("""
+            QLineEdit {
+                padding: 8px;
+                border: 2px solid #404040;
+                border-radius: 6px;
+                background: #3b3b3b;
+                color: white;
+                font-size: 11px;
+            }
+            QLineEdit:focus {
+                border-color: #ffc107;
+            }
+        """)
+        layout.addWidget(self.search_box)
+        
+        # Liste des nœuds
+        self.node_list = QListWidget()
+        self.node_list.setStyleSheet("""
+            QListWidget {
+                border: 1px solid #404040;
+                background: #3b3b3b;
+                color: white;
+                border-radius: 6px;
+            }
+            QListWidget::item {
+                padding: 8px;
+                border-bottom: 1px solid #404040;
+            }
+            QListWidget::item:hover {
+                background: #4b4b4b;
+            }
+            QListWidget::item:selected {
+                background: #ffc107;
+                color: black;
+            }
+        """)
+        layout.addWidget(self.node_list)
+        
+        self.setLayout(layout)
+        self.setFixedWidth(280)
+        self.setStyleSheet("background: #2b2b2b;")
+        
+    def setup_search(self):
+        """Configure la recherche et l'auto-complétion"""
+        # Créer la liste de tous les nœuds
+        self.all_nodes = []
+        for category, nodes in WORKFLOW_NODES.items():
+            self.all_nodes.extend(nodes)
+            
+        # Remplir la liste initiale
+        self.populate_list(self.all_nodes)
+        
+        # Connecter la recherche
+        self.search_box.textChanged.connect(self.filter_nodes)
+        self.node_list.itemDoubleClicked.connect(self.on_node_selected)
+        
+        # Drag & Drop
+        self.node_list.setDragDropMode(QListWidget.DragOnly)
+        
+    def populate_list(self, nodes):
+        """Remplit la liste avec les nœuds"""
+        self.node_list.clear()
+        
+        for node in nodes:
+            item = QListWidgetItem(f"{node['icon']} {node['name']}")
+            item.setData(Qt.UserRole, node)
+            
+            # Couleur selon le type
+            color = QColor(node['color'])
+            item.setBackground(QBrush(color.darker(300)))
+            
+            self.node_list.addItem(item)
+            
+    def filter_nodes(self, text):
+        """Filtre les nœuds selon la recherche"""
+        if not text:
+            self.populate_list(self.all_nodes)
+            return
+            
+        text = text.lower()
+        filtered = []
+        
+        for node in self.all_nodes:
+            # Recherche dans nom, catégorie et mots-clés
+            searchable = [
+                node['name'].lower(),
+                node['category'].lower(),
+            ] + [kw.lower() for kw in node.get('keywords', [])]
+            
+            if any(text in field for field in searchable):
+                filtered.append(node)
+                
+        self.populate_list(filtered)
+        
+    def on_node_selected(self, item):
+        """Nœud sélectionné pour ajout"""
+        node_data = item.data(Qt.UserRole)
+        self.node_requested.emit(node_data)
 
 class ConnectionPort(QGraphicsEllipseItem):
     """Port de connexion amélioré pour les transformers"""
@@ -277,13 +608,14 @@ class Connection(QGraphicsItem):
         self.scene().removeItem(self)
         self.animation_timer.stop()
 
-class TransformerNode(QGraphicsRectItem):
-    """Nœud transformer avancé avec interface riche"""
+class BaseWorkflowNode(QGraphicsRectItem):
+    """Classe de base pour tous les nœuds du workflow"""
     
-    def __init__(self, config: TransformerConfig, x=0, y=0):
-        super().__init__(0, 0, 180, 100)
+    def __init__(self, config, x=0, y=0, node_type="transformer"):
+        super().__init__(0, 0, 200, 120)
         self.setPos(x, y)
         self.config = config
+        self.node_type = node_type
         self.input_ports = []
         self.output_ports = []
         self.is_selected = False
@@ -414,8 +746,13 @@ class TransformerNode(QGraphicsRectItem):
             pass
     
     def duplicate_node(self):
-        """Duplique le nœud"""
-        new_node = TransformerNode(self.config, self.x() + 50, self.y() + 50)
+        """Duplique le nœud selon son type"""
+        if self.node_type == "reader":
+            new_node = ReaderNode(self.config, self.x() + 50, self.y() + 50)
+        elif self.node_type == "writer":
+            new_node = WriterNode(self.config, self.x() + 50, self.y() + 50)
+        else:
+            new_node = TransformerNode(self.config, self.x() + 50, self.y() + 50)
         self.scene().addItem(new_node)
     
     def delete_node(self):
@@ -567,12 +904,157 @@ class TransformerPropertiesDialog(QDialog):
         """Applique les modifications"""
         self.config.name = self.name_edit.text()
         self.config.description = self.desc_edit.toPlainText()
-        
         # Mettre à jour les paramètres
         for i in range(self.params_table.rowCount()):
             key = self.params_table.item(i, 0).text()
             value = self.params_table.item(i, 1).text()
             self.config.parameters[key] = value
+
+class ReaderNode(BaseWorkflowNode):
+    """Nœud Reader professionnel - Lecture de données"""
+    
+    def __init__(self, config: ReaderConfig, x=0, y=0):
+        super().__init__(config, x, y, "reader")
+        self.source_path = ""
+        self.layer_name = ""
+        
+    def create_ports(self):
+        """Crée uniquement des ports de sortie pour les readers"""
+        output_types = self.config.output_types or ["vector", "raster"]
+        for i, output_type in enumerate(output_types):
+            y_pos = 40 + (i * 30)
+            port = ConnectionPort(193, y_pos, "output", output_type, self)
+            port.setParentItem(self)
+            self.output_ports.append(port)
+    
+    def create_content(self):
+        """Interface spécialisée pour les readers"""
+        # Badge Reader
+        self.badge = QGraphicsRectItem(10, 10, 80, 25, self)
+        self.badge.setBrush(QBrush(QColor("#28a745")))
+        self.badge.setPen(QPen(QColor("#ffffff"), 1))
+        
+        badge_text = QGraphicsTextItem("📁 READER", self)
+        badge_text.setPos(12, 12)
+        badge_text.setFont(QFont("Arial", 8, QFont.Bold))
+        badge_text.setDefaultTextColor(QColor("#ffffff"))
+        
+        # Titre
+        self.title = QGraphicsTextItem(self.config.name, self)
+        self.title.setPos(10, 40)
+        self.title.setFont(QFont("Arial", 12, QFont.Bold))
+        
+        # Source type
+        source_text = QGraphicsTextItem(f"Source: {self.config.source_type}", self)
+        source_text.setPos(10, 65)
+        source_text.setFont(QFont("Arial", 9))
+        source_text.setDefaultTextColor(QColor("#666"))
+        
+        # Extensions supportées
+        ext_text = ', '.join(self.config.file_extensions[:3])  # Limite à 3
+        if len(self.config.file_extensions) > 3:
+            ext_text += "..."
+        extensions = QGraphicsTextItem(f"Formats: {ext_text}", self)
+        extensions.setPos(10, 85)
+        extensions.setFont(QFont("Arial", 8))
+        extensions.setDefaultTextColor(QColor("#888"))
+
+class TransformerNode(BaseWorkflowNode):
+    """Nœud Transformer professionnel - Traitement QGIS"""
+    
+    def __init__(self, config: TransformerConfig, x=0, y=0):
+        super().__init__(config, x, y, "transformer")
+        self.algorithm_id = ""
+        self.qgis_parameters = {}
+        
+    def create_content(self):
+        """Interface spécialisée pour les transformers"""
+        # Badge Transformer
+        self.badge = QGraphicsRectItem(10, 10, 100, 25, self)
+        self.badge.setBrush(QBrush(QColor("#FF9800")))
+        self.badge.setPen(QPen(QColor("#ffffff"), 1))
+        
+        badge_text = QGraphicsTextItem("⚙️ TRANSFORMER", self)
+        badge_text.setPos(12, 12)
+        badge_text.setFont(QFont("Arial", 8, QFont.Bold))
+        badge_text.setDefaultTextColor(QColor("#ffffff"))
+        
+        # Titre avec icône
+        title_text = f"{self.config.icon} {self.config.name}"
+        self.title = QGraphicsTextItem(title_text, self)
+        self.title.setPos(10, 40)
+        self.title.setFont(QFont("Arial", 11, QFont.Bold))
+        
+        # Catégorie QGIS
+        category = QGraphicsTextItem(f"Catégorie: {self.config.category}", self)
+        category.setPos(10, 65)
+        category.setFont(QFont("Arial", 9))
+        category.setDefaultTextColor(QColor("#666"))
+        
+        # Description courte
+        desc = self.config.description[:40] + "..." if len(self.config.description) > 40 else self.config.description
+        description = QGraphicsTextItem(desc, self)
+        description.setPos(10, 85)
+        description.setFont(QFont("Arial", 8))
+        description.setDefaultTextColor(QColor("#888"))
+        
+        # Barre de progression animée
+        self.progress_bg = QGraphicsRectItem(10, 105, 180, 4, self)
+        self.progress_bg.setBrush(QBrush(QColor("#e0e0e0")))
+        self.progress_bg.setVisible(False)
+        
+        self.progress_bar = QGraphicsRectItem(10, 105, 0, 4, self)
+        self.progress_bar.setBrush(QBrush(QColor("#FF9800")))
+        self.progress_bar.setVisible(False)
+
+class WriterNode(BaseWorkflowNode):
+    """Nœud Writer professionnel - Écriture de données"""
+    
+    def __init__(self, config: WriterConfig, x=0, y=0):
+        super().__init__(config, x, y, "writer")
+        self.output_path = ""
+        self.output_format = "shp"
+        
+    def create_ports(self):
+        """Crée uniquement des ports d'entrée pour les writers"""
+        input_types = self.config.input_types or ["vector", "raster", "table"]
+        for i, input_type in enumerate(input_types):
+            y_pos = 40 + (i * 30)
+            port = ConnectionPort(-7, y_pos, "input", input_type, self)
+            port.setParentItem(self)
+            self.input_ports.append(port)
+    
+    def create_content(self):
+        """Interface spécialisée pour les writers"""
+        # Badge Writer
+        self.badge = QGraphicsRectItem(10, 10, 80, 25, self)
+        self.badge.setBrush(QBrush(QColor("#2196F3")))
+        self.badge.setPen(QPen(QColor("#ffffff"), 1))
+        
+        badge_text = QGraphicsTextItem("💾 WRITER", self)
+        badge_text.setPos(12, 12)
+        badge_text.setFont(QFont("Arial", 8, QFont.Bold))
+        badge_text.setDefaultTextColor(QColor("#ffffff"))
+        
+        # Titre
+        self.title = QGraphicsTextItem(self.config.name, self)
+        self.title.setPos(10, 40)
+        self.title.setFont(QFont("Arial", 12, QFont.Bold))
+        
+        # Formats de sortie
+        formats_text = ', '.join(self.config.output_formats[:3])  # Limite à 3
+        if len(self.config.output_formats) > 3:
+            formats_text += "..."
+        formats = QGraphicsTextItem(f"Formats: {formats_text}", self)
+        formats.setPos(10, 65)
+        formats.setFont(QFont("Arial", 9))
+        formats.setDefaultTextColor(QColor("#666"))
+        
+        # Status de sauvegarde
+        status = QGraphicsTextItem("Prêt à écrire", self)
+        status.setPos(10, 85)
+        status.setFont(QFont("Arial", 8))
+        status.setDefaultTextColor(QColor("#28a745"))
 
 class WorkflowScene(QGraphicsScene):
     """Scène de workflow avancée"""

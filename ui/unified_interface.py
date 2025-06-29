@@ -11,27 +11,383 @@ from PyQt5.QtWidgets import (
     QSplitter, QLabel, QPushButton, QFrame, QMenuBar, QMenu, QAction,
     QToolBar, QStatusBar, QMessageBox, QApplication, QListWidget,
     QListWidgetItem, QLineEdit, QTextEdit, QGroupBox, QGraphicsView,
-    QGraphicsScene, QGraphicsItem, QGraphicsRectItem, QGraphicsTextItem
+    QGraphicsScene, QGraphicsItem, QGraphicsRectItem, QGraphicsTextItem,
+    QGraphicsPathItem, QGraphicsEllipseItem, QGraphicsLineItem
 )
-from PyQt5.QtCore import Qt, QTimer, QMimeData, pyqtSignal, QPointF, QPoint, QRect
+from PyQt5.QtCore import Qt, QTimer, QMimeData, pyqtSignal, QPointF, QPoint, QRect, QStringListModel
 from PyQt5.QtGui import (
     QFont, QIcon, QKeySequence, QPen, QBrush, QColor, QLinearGradient,
-    QDrag, QPainter, QPixmap
+    QDrag, QPainter, QPixmap, QPainterPath
 )
 
 # Import des composants
 try:
     from .qgis_plugin_ui import QGISPluginUI
-    from .workflow_mapper import WorkflowTestWindow
     from .qgis_integration import QGISProcessingIntegration
     print("✅ Tous les composants importés avec succès")
 except ImportError as e:
     print(f"❌ Erreur import composants: {e}")
     QGISPluginUI = None
-    WorkflowTestWindow = None
     QGISProcessingIntegration = None
 
-# === Classes pour Drag and Drop ===
+# === Classes du Workflow ===
+
+class Connection(QGraphicsPathItem):
+    """Ligne de connexion courbée entre deux ports."""
+    def __init__(self, start_port, end_port):
+        super().__init__()
+        self.start_port = start_port
+        self.end_port = end_port
+
+        self.setFlag(QGraphicsItem.ItemIsSelectable, True)
+        self.setZValue(-1) # S'assurer que la ligne est derrière les nœuds
+
+        self.pen = QPen(QColor("#4A90E2"), 2)
+        self.pen_selected = QPen(QColor("#ffc107"), 3)
+
+        self.start_port.add_connection(self)
+        self.end_port.add_connection(self)
+
+        self.update_path()
+
+    def update_path(self):
+        """Met à jour le tracé de la courbe de Bézier."""
+        start_pos = self.start_port.scenePos() + self.start_port.boundingRect().center()
+        end_pos = self.end_port.scenePos() + self.end_port.boundingRect().center()
+
+        path = QPainterPath()
+        path.moveTo(start_pos)
+
+        # Contrôles pour la courbe
+        dx = end_pos.x() - start_pos.x()
+        dy = end_pos.y() - start_pos.y()
+        ctrl1 = QPointF(start_pos.x() + dx * 0.5, start_pos.y())
+        ctrl2 = QPointF(end_pos.x() - dx * 0.5, end_pos.y())
+
+        path.cubicTo(ctrl1, ctrl2, end_pos)
+        self.setPath(path)
+
+    def paint(self, painter, option, widget=None):
+        """Dessine la connexion."""
+        self.setPen(self.pen_selected if self.isSelected() else self.pen)
+        super().paint(painter, option, widget)
+
+    def delete(self):
+        """Supprime la connexion de la scène et des ports."""
+        print(f"[DEBUG] Deleting connection: {self.start_port.parentItem().transformer_name} -> {self.end_port.parentItem().transformer_name}")
+        self.start_port.remove_connection(self)
+        self.end_port.remove_connection(self)
+        self.scene().removeItem(self)
+
+class ConnectionPort(QGraphicsEllipseItem):
+    """Port de connexion (entrée/sortie) sur un nœud."""
+    def __init__(self, parent, is_output=False):
+        super().__init__(-6, -6, 12, 12, parent)
+        self.is_output = is_output
+        self.connections = []
+
+        self.setBrush(QBrush(QColor("#ffffff")))
+        self.setPen(QPen(QColor("#4A90E2"), 2))
+        self.setAcceptHoverEvents(True)
+
+    def hoverEnterEvent(self, event):
+        self.setBrush(QBrush(QColor("#ffc107")))
+        super().hoverEnterEvent(event)
+
+    def hoverLeaveEvent(self, event):
+        self.setBrush(QBrush(QColor("#ffffff")))
+        super().hoverLeaveEvent(event)
+
+    def mousePressEvent(self, event):
+        """Démarre une tentative de connexion."""
+        print(f"[DEBUG] Port mousePressEvent: {self.is_output=}")
+        if event.button() == Qt.LeftButton:
+            if self.is_output:
+                self.scene().start_connection(self)
+        super().mousePressEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        """Termine une tentative de connexion."""
+        print(f"[DEBUG] Port mouseReleaseEvent: {self.is_output=}")
+        if event.button() == Qt.LeftButton:
+            if not self.is_output:
+                self.scene().end_connection(self)
+        super().mouseReleaseEvent(event)
+
+    def add_connection(self, connection):
+        self.connections.append(connection)
+
+    def remove_connection(self, connection):
+        if connection in self.connections:
+            self.connections.remove(connection)
+
+class WorkflowNode(QGraphicsRectItem):
+    """Nœud de workflow déplaçable et interactif avec ports."""
+    
+    def __init__(self, name, category, icon, x=0, y=0):
+        super().__init__(0, 0, 160, 80)
+        self.setPos(x, y)
+        self.transformer_name = name
+        self.transformer_category = category
+        self.transformer_icon = icon
+        self.input_port = None
+        self.output_port = None
+        
+        # Rendre le nœud interactif
+        self.setFlag(QGraphicsItem.ItemIsMovable, True)
+        self.setFlag(QGraphicsItem.ItemIsSelectable, True)
+        self.setFlag(QGraphicsItem.ItemSendsGeometryChanges, True)
+        
+        # Style
+        self.setup_style(category)
+        
+        # Contenu
+        self.create_content()
+        self.create_ports()
+        
+        self.setAcceptHoverEvents(True)
+
+    def setup_style(self, category):
+        """Définit le style visuel du nœud."""
+        colors = {
+            "Vector": QColor("#28a745"), "Raster": QColor("#dc3545"),
+            "Database": QColor("#6f42c1"), "General": QColor("#4A90E2")
+        }
+        base_color = colors.get(category, QColor("#4A90E2"))
+        gradient = QLinearGradient(0, 0, 0, 80)
+        gradient.setColorAt(0, base_color.lighter(120))
+        gradient.setColorAt(1, base_color.darker(120))
+        self.setBrush(QBrush(gradient))
+        self.setPen(QPen(base_color.darker(140), 2))
+
+    def create_content(self):
+        """Crée le contenu textuel du nœud."""
+        self.icon_text = QGraphicsTextItem(self.transformer_icon, self)
+        self.icon_text.setPos(10, 10)
+        self.icon_text.setFont(QFont("Arial", 16))
+        
+        self.name_text = QGraphicsTextItem(self.transformer_name, self)
+        self.name_text.setPos(35, 8)
+        self.name_text.setFont(QFont("Arial", 10, QFont.Bold))
+        self.name_text.setDefaultTextColor(QColor("#ffffff"))
+        
+        self.category_text = QGraphicsTextItem(f"📁 {self.transformer_category}", self)
+        self.category_text.setPos(35, 28)
+        self.category_text.setFont(QFont("Arial", 8))
+        self.category_text.setDefaultTextColor(QColor("#e9ecef"))
+
+    def create_ports(self):
+        """Crée les ports d'entrée et de sortie."""
+        self.input_port = ConnectionPort(self, is_output=False)
+        self.input_port.setPos(0, self.boundingRect().height() / 2 - 6) # Centré verticalement
+        
+        self.output_port = ConnectionPort(self, is_output=True)
+        self.output_port.setPos(self.boundingRect().width() - 12, self.boundingRect().height() / 2 - 6) # Centré verticalement
+
+    def itemChange(self, change, value):
+        """Met à jour les connexions lorsque le nœud est déplacé."""
+        if change == QGraphicsItem.ItemPositionHasChanged:
+            if self.input_port:
+                for conn in self.input_port.connections:
+                    conn.update_path()
+            if self.output_port:
+                for conn in self.output_port.connections:
+                    conn.update_path()
+        return super().itemChange(change, value)
+
+    def hoverEnterEvent(self, event):
+        self.setScale(1.05)
+        super().hoverEnterEvent(event)
+    
+    def hoverLeaveEvent(self, event):
+        if not self.isSelected():
+            self.setScale(1.0)
+        super().hoverLeaveEvent(event)
+
+    def mouseDoubleClickEvent(self, event):
+        """Ouvre une boîte de dialogue de configuration pour le nœud."""
+        if event.button() == Qt.LeftButton:
+            QMessageBox.information(None, "Configuration du Nœud", 
+                                    f"Configurer le nœud: {self.transformer_name}\nCatégorie: {self.transformer_category}")
+        super().mouseDoubleClickEvent(event)
+
+    def delete(self):
+        """Supprime le nœud et ses connexions de la scène."""
+        print(f"[DEBUG] Deleting node: {self.transformer_name}")
+        # Supprimer les connexions attachées aux ports
+        if self.input_port:
+            for conn in self.input_port.connections[:]: # Itérer sur une copie
+                conn.delete()
+        if self.output_port:
+            for conn in self.output_port.connections[:]: # Itérer sur une copie
+                conn.delete()
+        self.scene().removeItem(self)
+
+class ModernWorkflowScene(QGraphicsScene):
+    """Scène moderne avec grille et interactions fluides"""
+    
+    node_added = pyqtSignal(str)
+    elements_deleted = pyqtSignal() # Nouveau signal
+    
+    def __init__(self):
+        super().__init__()
+        self.transformer_data = [] # Sera défini par la fenêtre principale
+        self.setSceneRect(-2000, -2000, 4000, 3000)
+        self.setBackgroundBrush(QBrush(QColor("#f8f9fa")))
+        self.nodes = []
+        self.temp_connection = None
+        self.start_port = None
+        
+    def set_transformer_data(self, data):
+        """Reçoit les données des transformers depuis la fenêtre principale."""
+        self.transformer_data = data
+        
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasText() and event.mimeData().text().startswith("transformer:"):
+            event.acceptProposedAction()
+    
+    def dragMoveEvent(self, event):
+        if event.mimeData().hasText() and event.mimeData().text().startswith("transformer:"):
+            event.acceptProposedAction()
+    
+    def dropEvent(self, event):
+        if event.mimeData().hasText() and event.mimeData().text().startswith("transformer:"):
+            data = event.mimeData().text().split(":")
+            if len(data) >= 4:
+                _, name, category, icon = data[:4]
+                pos = event.scenePos()
+                node = WorkflowNode(name, category, icon, pos.x() - 80, pos.y() - 40)
+                self.addItem(node)
+                self.nodes.append(node)
+                self.node_added.emit(name)
+                event.acceptProposedAction()
+    
+    def drawBackground(self, painter, rect):
+        super().drawBackground(painter, rect)
+        painter.setPen(QPen(QColor("#e9ecef"), 1))
+        grid_size = 25
+        left = int(rect.left()) - (int(rect.left()) % grid_size)
+        top = int(rect.top()) - (int(rect.top()) % grid_size)
+        for x in range(left, int(rect.right()), grid_size):
+            painter.drawLine(x, int(rect.top()), x, int(rect.bottom()))
+        for y in range(top, int(rect.bottom()), grid_size):
+            painter.drawLine(int(rect.left()), y, int(rect.right()), y)
+
+    def start_connection(self, port):
+        """Démarre le dessin d'une ligne de connexion temporaire."""
+        print(f"[DEBUG] Scene start_connection from {port.parentItem().transformer_name}")
+        self.start_port = port
+        self.temp_connection = QGraphicsLineItem()
+        self.temp_connection.setPen(QPen(QColor("#ffc107"), 2, Qt.DashLine))
+        self.addItem(self.temp_connection)
+        self.update_temp_connection(port.scenePos() + port.boundingRect().center())
+
+    def end_connection(self, end_port):
+        """Finalise la connexion si elle est valide."""
+        print(f"[DEBUG] Scene end_connection to {end_port.parentItem().transformer_name}")
+        if self.temp_connection and self.start_port and end_port != self.start_port:
+            # Vérifier que c'est une connexion output -> input
+            if self.start_port.is_output and not end_port.is_output:
+                connection = Connection(self.start_port, end_port)
+                self.addItem(connection)
+                print(f"[DEBUG] Connection created: {self.start_port.parentItem().transformer_name} -> {end_port.parentItem().transformer_name}")
+            else:
+                print("[DEBUG] Invalid connection attempt: not output -> input")
+        else:
+            print("[DEBUG] Connection not finalized: missing temp_connection or start_port, or same port")
+        self.cleanup_connection()
+
+    def mouseMoveEvent(self, event):
+        """Met à jour la ligne de connexion temporaire."""
+        if self.temp_connection:
+            self.update_temp_connection(event.scenePos())
+        super().mouseMoveEvent(event)
+
+    def mouseDoubleClickEvent(self, event):
+        """Affiche un champ de recherche pour ajouter un nœud rapidement."""
+        if self.itemAt(event.scenePos(), self.views()[0].transform()) is None:
+            self.show_node_search_box(event.scenePos())
+        super().mouseDoubleClickEvent(event)
+
+    def show_node_search_box(self, position):
+        """Crée et affiche un QLineEdit avec auto-complétion sur la scène."""
+        from PyQt5.QtWidgets import QLineEdit, QCompleter
+        from PyQt5.QtCore import QStringListModel
+
+        # Créer la liste des noms pour l'auto-complétion
+        transformer_names = [f"{item[2]} {item[0]}" for item in self.transformer_data]
+        model = QStringListModel(transformer_names)
+        completer = QCompleter()
+        completer.setModel(model)
+        completer.setCaseSensitivity(Qt.CaseInsensitive)
+
+        # Créer le champ de texte
+        line_edit = QLineEdit()
+        line_edit.setCompleter(completer)
+        line_edit.setFixedSize(250, 30)
+        line_edit.setStyleSheet("""QLineEdit { 
+            border: 1px solid #4A90E2; 
+            border-radius: 4px; 
+            padding: 4px; 
+            background: white;
+            font-size: 11pt;
+        }""")
+
+        # Logique pour ajouter le nœud quand on appuie sur Entrée
+        def add_node():
+            text = line_edit.text()
+            found = False
+            for name, category, icon, desc in self.transformer_data:
+                if f"{icon} {name}" == text:
+                    node = WorkflowNode(name, category, icon, position.x(), position.y())
+                    self.addItem(node)
+                    found = True
+                    break
+            line_edit.deleteLater()
+
+        line_edit.returnPressed.connect(add_node)
+        line_edit.editingFinished.connect(line_edit.deleteLater) # Auto-destruction si on clique ailleurs
+
+        # Ajouter le QLineEdit à la scène via un proxy
+        proxy = self.addWidget(line_edit)
+        proxy.setPos(position)
+        line_edit.setFocus()
+
+    def mouseReleaseEvent(self, event):
+        print("[DEBUG] Scene mouseReleaseEvent")
+        item = self.itemAt(event.scenePos(), self.views()[0].transform())
+        if not isinstance(item, ConnectionPort):
+             self.cleanup_connection()
+        super().mouseReleaseEvent(event)
+
+    def update_temp_connection(self, end_pos):
+        if self.temp_connection and self.start_port:
+            start_pos = self.start_port.scenePos() + self.start_port.boundingRect().center()
+            self.temp_connection.setLine(start_pos.x(), start_pos.y(), end_pos.x(), end_pos.y())
+
+    def cleanup_connection(self):
+        print("[DEBUG] Cleaning up connection")
+        if self.temp_connection:
+            self.removeItem(self.temp_connection)
+            self.temp_connection = None
+            self.start_port = None
+
+    def keyPressEvent(self, event):
+        """Gère la suppression des éléments sélectionnés avec la touche Suppr."""
+        if event.key() == Qt.Key_Delete:
+            print("[DEBUG] Delete key pressed.")
+            for item in self.selectedItems():
+                if isinstance(item, WorkflowNode):
+                    item.delete()
+                elif isinstance(item, Connection):
+                    item.delete()
+            self.elements_deleted.emit() # Notifier la fenêtre principale
+        super().keyPressEvent(event)
+
+# Alias pour la compatibilité
+WorkflowScene = ModernWorkflowScene
+
+# === Classes de l'interface principale ===
 
 class DraggableTransformerItem(QListWidgetItem):
     """Item de transformer avec support du drag and drop"""
@@ -106,348 +462,35 @@ class DraggableTransformerList(QListWidget):
         painter.end()
         
         drag.setPixmap(pixmap)
-        # CORRECTION: Utiliser QPoint au lieu de QPointF
-        from PyQt5.QtCore import QPoint
         drag.setHotSpot(QPoint(100, 30))
         
         # Exécuter le drag
         dropAction = drag.exec_(Qt.CopyAction)
 
-class WorkflowNode(QGraphicsRectItem):
-    """Nœud de workflow déplaçable et interactif"""
-    
-    def __init__(self, name, category, icon, x=0, y=0):
-        super().__init__(0, 0, 160, 80)
-        self.setPos(x, y)
-        self.transformer_name = name
-        self.transformer_category = category
-        self.transformer_icon = icon
-        
-        # Rendre le nœud interactif
-        self.setFlag(QGraphicsItem.ItemIsMovable, True)
-        self.setFlag(QGraphicsItem.ItemIsSelectable, True)
-        self.setFlag(QGraphicsItem.ItemSendsGeometryChanges, True)
-        
-        # Style selon la catégorie
-        colors = {
-            "Vector": QColor("#28a745"),
-            "Raster": QColor("#dc3545"),
-            "Database": QColor("#6f42c1"),
-            "General": QColor("#4A90E2")
-        }
-        
-        base_color = colors.get(category, QColor("#4A90E2"))
-        
-        # Gradient de fond
-        gradient = QLinearGradient(0, 0, 0, 80)
-        gradient.setColorAt(0, base_color.lighter(120))
-        gradient.setColorAt(1, base_color.darker(120))
-        
-        self.setBrush(QBrush(gradient))
-        self.setPen(QPen(base_color.darker(140), 2))
-        
-        # Créer le contenu textuel
-        self.create_content()
-        
-        # Effet de sélection
-        self.setAcceptHoverEvents(True)
-    
-    def create_content(self):
-        """Crée le contenu visuel du nœud"""
-        # Icône
-        self.icon_text = QGraphicsTextItem(self.transformer_icon, self)
-        self.icon_text.setPos(10, 10)
-        self.icon_text.setFont(QFont("Arial", 16))
-        
-        # Nom
-        self.name_text = QGraphicsTextItem(self.transformer_name, self)
-        self.name_text.setPos(35, 8)
-        self.name_text.setFont(QFont("Arial", 10, QFont.Bold))
-        self.name_text.setDefaultTextColor(QColor("#ffffff"))
-        
-        # Catégorie
-        self.category_text = QGraphicsTextItem(f"📁 {self.transformer_category}", self)
-        self.category_text.setPos(35, 28)
-        self.category_text.setFont(QFont("Arial", 8))
-        self.category_text.setDefaultTextColor(QColor("#e9ecef"))
-    
-    def hoverEnterEvent(self, event):
-        """Effet de survol"""
-        self.setScale(1.05)
-        super().hoverEnterEvent(event)
-    
-    def hoverLeaveEvent(self, event):
-        """Fin de survol"""
-        if not self.isSelected():
-            self.setScale(1.0)
-        super().hoverLeaveEvent(event)
-
-class QuickAddDialog(QWidget):
-    """Dialog de recherche rapide pour ajouter des transformers"""
-    
-    transformer_selected = pyqtSignal(str, str, str)  # name, category, icon
-    
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setWindowFlags(Qt.Popup | Qt.FramelessWindowHint)
-        self.setFixedSize(300, 200)
-        self.transformers_data = self.get_transformers_data()
-        self.init_ui()
-        
-    def init_ui(self):
-        layout = QVBoxLayout()
-        layout.setContentsMargins(8, 8, 8, 8)
-        
-        # En-tête
-        header = QLabel("⚡ Ajout Rapide de Transformer")
-        header.setFont(QFont("Arial", 12, QFont.Bold))
-        header.setStyleSheet("color: #495057; margin-bottom: 5px;")
-        
-        # Champ de recherche
-        self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("Tapez le nom du transformer...")
-        self.search_input.textChanged.connect(self.filter_results)
-        self.search_input.returnPressed.connect(self.select_first_result)
-        
-        # Liste des résultats
-        self.results_list = QListWidget()
-        self.results_list.setMaximumHeight(120)
-        self.results_list.itemDoubleClicked.connect(self.on_item_selected)
-        
-        # Raccourcis rapides
-        shortcuts_layout = QHBoxLayout()
-        
-        input_btn = QPushButton("📥 Input")
-        output_btn = QPushButton("📤 Output") 
-        buffer_btn = QPushButton("🔲 Buffer")
-        
-        input_btn.clicked.connect(lambda: self.add_transformer("Input", "General", "📥"))
-        output_btn.clicked.connect(lambda: self.add_transformer("Output", "General", "📤"))
-        buffer_btn.clicked.connect(lambda: self.add_transformer("Buffer", "Vector", "🔲"))
-        
-        for btn in [input_btn, output_btn, buffer_btn]:
-            btn.setMaximumHeight(30)
-            btn.setStyleSheet("""
-                QPushButton {
-                    background: #f8f9fa;
-                    border: 1px solid #dee2e6;
-                    border-radius: 4px;
-                    padding: 4px 8px;
-                    font-size: 10px;
-                }
-                QPushButton:hover { background: #e9ecef; }
-            """)
-        
-        shortcuts_layout.addWidget(input_btn)
-        shortcuts_layout.addWidget(output_btn)
-        shortcuts_layout.addWidget(buffer_btn)
-        
-        layout.addWidget(header)
-        layout.addWidget(self.search_input)
-        layout.addWidget(self.results_list)
-        layout.addLayout(shortcuts_layout)
-        
-        self.setLayout(layout)
-        
-        # Style du dialog
-        self.setStyleSheet("""
-            QWidget {
-                background: white;
-                border: 2px solid #4A90E2;
-                border-radius: 8px;
-            }
-            QLineEdit {
-                padding: 8px;
-                border: 1px solid #dee2e6;
-                border-radius: 4px;
-                font-size: 12px;
-            }
-            QListWidget {
-                border: 1px solid #dee2e6;
-                border-radius: 4px;
-            }
-            QListWidget::item {
-                padding: 6px;
-                border-bottom: 1px solid #f1f3f4;
-            }
-            QListWidget::item:hover {
-                background: #e3f2fd;
-            }
-            QListWidget::item:selected {
-                background: #4A90E2;
-                color: white;
-            }
-        """)
-        
-        # Remplir la liste initialement
-        self.populate_all_results()
-    
-    def get_transformers_data(self):
-        """Données des transformers disponibles"""
-        return [
-            ("Input", "General", "📥"),
-            ("Output", "General", "📤"),
-            ("Buffer", "Vector", "🔲"),
-            ("Clip", "Vector", "✂️"),
-            ("Merge", "Vector", "🔗"),
-            ("Dissolve", "Vector", "🫧"),
-            ("Reproject", "Vector", "🌍"),
-            ("Field Calculator", "Vector", "🧮"),
-            ("Intersection", "Vector", "∩"),
-            ("Union", "Vector", "∪"),
-            ("Difference", "Vector", "⊖"),
-            ("Centroid", "Vector", "⊙"),
-            ("Raster Calculator", "Raster", "📊"),
-            ("Warp", "Raster", "🔄"),
-            ("Polygonize", "Raster", "🔷"),
-            ("Zonal Statistics", "Raster", "📈"),
-            ("Export Database", "Database", "🗃️"),
-            ("Join Attributes", "Database", "🔗")
-        ]
-    
-    def populate_all_results(self):
-        """Remplit la liste avec tous les transformers"""
-        self.results_list.clear()
-        for name, category, icon in self.transformers_data:
-            item = QListWidgetItem(f"{icon} {name} ({category})")
-            item.setData(Qt.UserRole, (name, category, icon))
-            self.results_list.addItem(item)
-    
-    def filter_results(self, text):
-        """Filtre les résultats selon le texte"""
-        self.results_list.clear()
-        
-        if not text.strip():
-            self.populate_all_results()
-            return
-        
-        text_lower = text.lower()
-        for name, category, icon in self.transformers_data:
-            if (text_lower in name.lower() or 
-                text_lower in category.lower()):
-                item = QListWidgetItem(f"{icon} {name} ({category})")
-                item.setData(Qt.UserRole, (name, category, icon))
-                self.results_list.addItem(item)
-    
-    def select_first_result(self):
-        """Sélectionne le premier résultat avec Entrée"""
-        if self.results_list.count() > 0:
-            first_item = self.results_list.item(0)
-            self.on_item_selected(first_item)
-    
-    def on_item_selected(self, item):
-        """Appelé quand un item est sélectionné"""
-        data = item.data(Qt.UserRole)
-        if data:
-            name, category, icon = data
-            self.add_transformer(name, category, icon)
-    
-    def add_transformer(self, name, category, icon):
-        """Émet le signal pour ajouter le transformer"""
-        self.transformer_selected.emit(name, category, icon)
-        self.hide()
-    
-    def showEvent(self, event):
-        """Appelé quand le dialog s'affiche"""
-        super().showEvent(event)
-        self.search_input.setFocus()
-        self.search_input.selectAll()
-    
-    def keyPressEvent(self, event):
-        """Gestion des touches"""
-        if event.key() == Qt.Key_Escape:
-            self.hide()
-        elif event.key() == Qt.Key_Up:
-            current = self.results_list.currentRow()
-            if current > 0:
-                self.results_list.setCurrentRow(current - 1)
-        elif event.key() == Qt.Key_Down:
-            current = self.results_list.currentRow()
-            if current < self.results_list.count() - 1:
-                self.results_list.setCurrentRow(current + 1)
-        else:
-            super().keyPressEvent(event)
-    """Scène interactive pour le workflow avec support drop"""
-    
-    node_added = pyqtSignal(str)
-    
-    def __init__(self):
-        super().__init__()
-        self.setSceneRect(0, 0, 2000, 1500)
-        self.setBackgroundBrush(QBrush(QColor("#f8f9fa")))
-        self.nodes = []
-        
-    def dragEnterEvent(self, event):
-        """Accepte le drag des transformers"""
-        if event.mimeData().hasText() and event.mimeData().text().startswith("transformer:"):
-            event.acceptProposedAction()
-    
-    def dragMoveEvent(self, event):
-        """Gère le mouvement pendant le drag"""
-        if event.mimeData().hasText() and event.mimeData().text().startswith("transformer:"):
-            event.acceptProposedAction()
-    
-    def dropEvent(self, event):
-        """Gère le drop d'un transformer"""
-        if event.mimeData().hasText() and event.mimeData().text().startswith("transformer:"):
-            # Extraire les données du transformer
-            data = event.mimeData().text().split(":")
-            if len(data) >= 4:
-                _, name, category, icon = data[:4]
-                
-                # Position du drop
-                pos = event.scenePos()
-                
-                # Créer le nœud
-                node = WorkflowNode(name, category, icon, pos.x() - 80, pos.y() - 40)
-                self.addItem(node)
-                self.nodes.append(node)
-                
-                # Animation d'apparition
-                node.setScale(0.1)
-                animation = QTimer()
-                scale = [0.1]  # Liste pour éviter les problèmes de closure
-                
-                def animate():
-                    scale[0] += 0.1
-                    node.setScale(scale[0])
-                    if scale[0] >= 1.0:
-                        animation.stop()
-                
-                animation.timeout.connect(animate)
-                animation.start(30)
-                
-                self.node_added.emit(name)
-                event.acceptProposedAction()
-    
-    def drawBackground(self, painter, rect):
-        """Dessine le fond avec grille"""
-        super().drawBackground(painter, rect)
-        
-        # Grille légère
-        painter.setPen(QPen(QColor("#e9ecef"), 1))
-        
-        grid_size = 25
-        left = int(rect.left()) - (int(rect.left()) % grid_size)
-        top = int(rect.top()) - (int(rect.top()) % grid_size)
-        
-        # Lignes verticales
-        for x in range(left, int(rect.right()), grid_size):
-            painter.drawLine(x, int(rect.top()), x, int(rect.bottom()))
-        
-        # Lignes horizontales
-        for y in range(top, int(rect.bottom()), grid_size):
-            painter.drawLine(int(rect.left()), y, int(rect.right()), y)
-
 class InteractiveWorkflowView(QGraphicsView):
-    """Vue interactive du workflow avec support clavier"""
+    """
+    Vue interactive améliorée du workflow.
+    - Zoom intelligent avec la molette (centré sur la souris).
+    - Panoramique (déplacement) avec le clic du milieu de la souris).
+    - Rendu de haute qualité (anti-crénelage).
+    """
     
     def __init__(self, scene):
         super().__init__(scene)
-        self.setAcceptDrops(True)
-        self.setDragMode(QGraphicsView.RubberBandDrag)
+        self._is_panning = False
+        self._last_pan_point = QPoint()
+
+        # --- Améliorations de la fluidité et de la qualité ---
         self.setRenderHint(QPainter.Antialiasing)
-        self.setFocusPolicy(Qt.StrongFocus)  # Permettre le focus clavier
+        self.setRenderHint(QPainter.TextAntialiasing)
+        self.setRenderHint(QPainter.SmoothPixmapTransform)
+        
+        self.setDragMode(QGraphicsView.RubberBandDrag) # Sélection en rectangle
+        self.setTransformationAnchor(QGraphicsView.AnchorUnderMouse)
+        self.setResizeAnchor(QGraphicsView.AnchorViewCenter)
+        
+        self.setAcceptDrops(True)
+        self.setFocusPolicy(Qt.StrongFocus)
         
         # Style
         self.setStyleSheet("""
@@ -457,19 +500,52 @@ class InteractiveWorkflowView(QGraphicsView):
                 background: white;
             }
         """)
-    
+
     def wheelEvent(self, event):
-        """Zoom avec la molette"""
-        factor = 1.2
-        if event.angleDelta().y() < 0:
-            factor = 1.0 / factor
-        
-        self.scale(factor, factor)
-    
+        """Zoom centré sur la souris pour une navigation intuitive."""
+        zoom_in_factor = 1.15
+        zoom_out_factor = 1 / zoom_in_factor
+
+        # Zoom avant ou arrière
+        if event.angleDelta().y() > 0:
+            self.scale(zoom_in_factor, zoom_in_factor)
+        else:
+            self.scale(zoom_out_factor, zoom_out_factor)
+
     def mousePressEvent(self, event):
-        """Gère les clics de souris - assure le focus pour les raccourcis"""
-        self.setFocus()  # S'assurer que la vue a le focus pour les raccourcis clavier
+        """Initialise le panoramique avec le clic du milieu."""
+        if event.button() == Qt.MiddleButton:
+            self._is_panning = True
+            self._last_pan_point = event.pos()
+            self.setCursor(Qt.ClosedHandCursor)
+            event.accept()
+            return
+        
+        self.setFocus()
         super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        """Effectue le panoramique si activé."""
+        if self._is_panning:
+            delta = event.pos() - self._last_pan_point
+            self._last_pan_point = event.pos()
+            
+            # Déplacer la vue en utilisant les barres de défilement
+            self.horizontalScrollBar().setValue(self.horizontalScrollBar().value() - delta.x())
+            self.verticalScrollBar().setValue(self.verticalScrollBar().value() - delta.y())
+            
+            event.accept()
+            return
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        """Arrête le panoramique."""
+        if event.button() == Qt.MiddleButton:
+            self._is_panning = False
+            self.setCursor(Qt.ArrowCursor)
+            event.accept()
+            return
+        super().mouseReleaseEvent(event)
 
 class UnifiedGISENGINEInterface(QMainWindow):
     """Interface principale unifiée GISENGINE"""
@@ -552,7 +628,7 @@ class UnifiedGISENGINEInterface(QMainWindow):
         toolbar = self.addToolBar('🔧 Outils Principaux')
         toolbar.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
         
-        # Navigation rapide entre onglets - SYNTAXE CORRIGÉE
+        # Navigation rapide entre onglets
         tab1_action = QAction('🛠️ Transformers', self)
         tab1_action.setToolTip('Bibliothèque de Transformers')
         tab1_action.triggered.connect(lambda: self.tabs.setCurrentIndex(0))
@@ -571,7 +647,7 @@ class UnifiedGISENGINEInterface(QMainWindow):
         
         toolbar.addSeparator()
         
-        # Actions de workflow - SYNTAXE CORRIGÉE
+        # Actions de workflow
         validate_action = QAction('✅ Valider', self)
         validate_action.setToolTip('Valider le workflow')
         validate_action.triggered.connect(self.validate_workflow)
@@ -821,6 +897,31 @@ class UnifiedGISENGINEInterface(QMainWindow):
             error_widget = self.create_error_widget(f"Erreur workflow: {str(e)}")
             self.tabs.addTab(error_widget, "📊 Workflow (Erreur)")
     
+    def get_transformers_data_for_scene(self):
+        """Retourne les données des transformers pour la scène."""
+        return [
+            ("Buffer", "Vector", "🔲", "Crée une zone tampon autour des géométries"),
+            ("Clip", "Vector", "✂️", "Découpe les entités avec un masque"),
+            ("Merge", "Vector", "🔗", "Fusionne plusieurs couches vectorielles"),
+            ("Dissolve", "Vector", "🫧", "Dissout les géométries adjacentes"),
+            ("Reproject", "Vector", "🌍", "Change la projection des données"),
+            ("Field Calculator", "Vector", "🧮", "Calcule de nouveaux champs"),
+            ("Intersection", "Vector", "∩", "Calcule l'intersection entre couches"),
+            ("Union", "Vector", "∪", "Calcule l'union de géométries"),
+            ("Difference", "Vector", "⊖", "Calcule la différence entre couches"),
+            ("Centroid", "Vector", "⊙", "Calcule les centroïdes des géométries"),
+            ("Raster Calculator", "Raster", "📊", "Effectue des calculs sur rasters"),
+            ("Warp", "Raster", "🔄", "Reprojette les données raster"),
+            ("Polygonize", "Raster", "🔷", "Convertit raster en polygones"),
+            ("Zonal Statistics", "Raster", "📈", "Calcule des statistiques par zones"),
+            ("Aspect", "Raster", "🧭", "Calcule l'exposition des pentes"),
+            ("Slope", "Raster", "📐", "Calcule la pente du terrain"),
+            ("Export Database", "Database", "🗃️", "Exporte vers une base de données"),
+            ("Join Attributes", "Database", "🔗", "Joint des attributs par clé"),
+            ("Import CSV", "Database", "📄", "Importe des données CSV"),
+            ("SQL Query", "Database", "💾", "Exécute une requête SQL")
+        ]
+
     def create_interactive_workflow_widget(self):
         """Crée un widget workflow avec drag and drop et clic droit"""
         widget = QWidget()
@@ -887,37 +988,12 @@ class UnifiedGISENGINEInterface(QMainWindow):
         canvas_widget = QWidget()
         canvas_layout = QVBoxLayout()
         
-        # Zone de drop avec instructions visuelles étendues
-        drop_info = QLabel(
-            "🎯 Canvas Interactif GISENGINE\n\n"
-            "🖱️ Clic droit → Recherche rapide de transformers\n"
-            "🖱️ Glisser-déposer depuis la bibliothèque\n"
-            "⌨️ Raccourcis: I=Input, O=Output, Espace=Recherche\n"
-            "🔄 Déplacez les nœuds librement\n"
-            "🗑️ Suppr pour effacer la sélection"
-        )
-        drop_info.setAlignment(Qt.AlignCenter)
-        drop_info.setStyleSheet("""
-            QLabel {
-                border: 3px dashed #4A90E2;
-                border-radius: 12px;
-                background: rgba(74, 144, 226, 0.1);
-                color: #4A90E2;
-                font-weight: bold;
-                padding: 25px;
-                margin: 10px;
-                line-height: 1.4;
-            }
-        """)
-        
         # Scène de workflow interactive
-        self.workflow_scene = InteractiveWorkflowScene()
+        self.workflow_scene = ModernWorkflowScene()
+        # Passer les données des transformers à la scène
+        self.workflow_scene.set_transformer_data(self.get_transformers_data_for_scene())
         self.workflow_view = InteractiveWorkflowView(self.workflow_scene)
         
-        # Connecter les signaux
-        self.workflow_scene.node_added.connect(self.on_workflow_node_added)
-        
-        canvas_layout.addWidget(drop_info)
         canvas_layout.addWidget(self.workflow_view)
         canvas_widget.setLayout(canvas_layout)
         
@@ -1033,16 +1109,30 @@ class UnifiedGISENGINEInterface(QMainWindow):
         return widget
     
     def add_quick_input(self):
-        """Ajoute rapidement un Input au centre"""
-        if hasattr(self, 'workflow_view'):
-            center = self.workflow_view.mapToScene(self.workflow_view.rect().center())
-            self.workflow_scene.create_node_at_position("Input", "General", "📥", center.x() - 80, center.y() - 40)
+        """Ajoute un input rapide"""
+        try:
+            if hasattr(self, 'workflow_view') and hasattr(self, 'workflow_scene'):
+                center = self.workflow_view.mapToScene(self.workflow_view.rect().center())
+                node = WorkflowNode("Input", "General", "📥", center.x(), center.y())
+                self.workflow_scene.addItem(node)
+                self.workflow_scene.nodes.append(node) # Ajouter à la liste des nœuds de la scène
+                self.status_message.setText("Input ajouté")
+                self.on_workflow_node_added("Input") # Mettre à jour les statistiques
+        except Exception as e:
+            print(f"Erreur ajout input: {e}")
     
     def add_quick_output(self):
-        """Ajoute rapidement un Output au centre"""
-        if hasattr(self, 'workflow_view'):
-            center = self.workflow_view.mapToScene(self.workflow_view.rect().center())
-            self.workflow_scene.create_node_at_position("Output", "General", "📤", center.x() - 80, center.y() - 40)
+        """Ajoute un output rapide"""
+        try:
+            if hasattr(self, 'workflow_scene') and self.workflow_scene:
+                center = self.workflow_view.mapToScene(self.workflow_view.rect().center())
+                node = WorkflowNode("Output", "General", "📤", center.x(), center.y())
+                self.workflow_scene.addItem(node)
+                self.workflow_scene.nodes.append(node) # Ajouter à la liste des nœuds de la scène
+                self.status_message.setText("Output ajouté")
+                self.on_workflow_node_added("Output") # Mettre à jour les statistiques
+        except Exception as e:
+            print(f"Erreur ajout output: {e}")
     
     def show_workflow_help(self):
         """Affiche l'aide du workflow"""
@@ -1085,7 +1175,6 @@ class UnifiedGISENGINEInterface(QMainWindow):
         elif node_count >= 3:
             self.workflow_status.setText("Status: 🟢 Prêt")
         
-        import datetime
         timestamp = datetime.datetime.now().strftime("%H:%M:%S")
         self.workflow_log.append(f"[{timestamp}] Nœud '{name}' ajouté")
         
@@ -1095,7 +1184,6 @@ class UnifiedGISENGINEInterface(QMainWindow):
         """Vide le canvas du workflow"""
         if hasattr(self, 'workflow_scene'):
             self.workflow_scene.clear()
-            self.workflow_scene.nodes.clear()
             self.workflow_node_count.setText("Nœuds: 0")
             self.workflow_status.setText("Status: ⚪ Vide")
             self.workflow_log.append("[System] Canvas vidé")
@@ -1109,7 +1197,8 @@ class UnifiedGISENGINEInterface(QMainWindow):
     def validate_workflow(self):
         """Valide le workflow"""
         if hasattr(self, 'workflow_scene'):
-            node_count = len(self.workflow_scene.nodes)
+            # Compter les items dans la scène (approximation)
+            node_count = len([item for item in self.workflow_scene.items() if hasattr(item, 'transformer_name')])
             if node_count == 0:
                 self.workflow_log.append("[Validation] ❌ Aucun nœud")
             elif node_count < 2:
@@ -1120,20 +1209,18 @@ class UnifiedGISENGINEInterface(QMainWindow):
     def create_example_workflow(self):
         """Crée un workflow d'exemple"""
         if hasattr(self, 'workflow_scene'):
-            # Ajouter des nœuds d'exemple
-            nodes_data = [
-                ("Input", "General", "📥", 150, 200),
-                ("Buffer", "Vector", "🔲", 400, 200),
-                ("Output", "General", "📤", 650, 200)
+            # Créer des nœuds d'exemple basiques (simulation)
+            node_data = [
+                ("Input", 150, 200),
+                ("Buffer", 400, 200),
+                ("Output", 650, 200)
             ]
             
-            for name, category, icon, x, y in nodes_data:
-                node = WorkflowNode(name, category, icon, x, y)
+            for name, x, y in node_data:
+                node = WorkflowNode(name, "General", "⚙️", x, y)
                 self.workflow_scene.addItem(node)
-                self.workflow_scene.nodes.append(node)
             
-            self.on_workflow_node_added("Exemple créé")
-            self.workflow_log.append("[System] Workflow d'exemple créé")
+            self.workflow_log.append("[System] Workflow d'exemple créé (simulation)")
     
     def setup_processing_tab(self):
         """Configure l'onglet du scanner processing"""
@@ -1150,234 +1237,6 @@ class UnifiedGISENGINEInterface(QMainWindow):
         except Exception as e:
             error_widget = self.create_error_widget(f"Erreur processing: {str(e)}")
             self.tabs.addTab(error_widget, "⚙️ Processing (Erreur)")
-    
-    def create_simple_transformers_widget(self):
-        """Crée un widget transformers simple et interactif"""
-        widget = QWidget()
-        layout = QVBoxLayout()
-        
-        # En-tête
-        header = QLabel("🛠️ Bibliothèque de Transformers")
-        header.setFont(QFont("Arial", 14, QFont.Bold))
-        header.setStyleSheet("color: #495057; margin: 10px 0;")
-        
-        # Zone de recherche
-        search_box = QLineEdit()
-        search_box.setPlaceholderText("🔍 Rechercher un transformer...")
-        search_box.setStyleSheet("""
-            QLineEdit {
-                padding: 8px 12px;
-                border: 2px solid #dee2e6;
-                border-radius: 6px;
-                font-size: 12px;
-            }
-        """)
-        
-        # Liste des transformers
-        transformers_list = QListWidget()
-        transformers_list.setStyleSheet("""
-            QListWidget {
-                border: 2px solid #dee2e6;
-                border-radius: 6px;
-                background: white;
-                padding: 4px;
-            }
-            QListWidget::item {
-                padding: 8px;
-                border-bottom: 1px solid #f1f3f4;
-                border-radius: 3px;
-                margin: 1px;
-            }
-            QListWidget::item:hover {
-                background: #e9ecef;
-            }
-            QListWidget::item:selected {
-                background: #4A90E2;
-                color: white;
-            }
-        """)
-        
-        # Remplir la liste
-        transformers_data = [
-            "🔲 Buffer - Crée une zone tampon",
-            "✂️ Clip - Découpe les entités", 
-            "🌍 Reproject - Change la projection",
-            "🧮 Field Calculator - Calcule des champs",
-            "🔗 Merge - Fusionne les couches",
-            "🫧 Dissolve - Dissout les géométries",
-            "📊 Raster Calculator - Calculs raster",
-            "🔄 Warp - Reprojette les rasters",
-            "🔷 Polygonize - Raster vers polygones",
-            "🗃️ Export Database - Export vers BD"
-        ]
-        
-        for transformer in transformers_data:
-            transformers_list.addItem(transformer)
-        
-        # Boutons d'action
-        button_layout = QHBoxLayout()
-        add_btn = QPushButton("➕ Ajouter au Workflow")
-        add_btn.clicked.connect(lambda: self.tabs.setCurrentIndex(1))  # Aller au workflow
-        
-        modeler_btn = QPushButton("🛠️ Ouvrir Processing Modeler")
-        
-        add_btn.setStyleSheet("""
-            QPushButton {
-                padding: 8px 16px;
-                background: #4A90E2;
-                color: white;
-                border: none;
-                border-radius: 4px;
-                font-weight: bold;
-            }
-            QPushButton:hover { background: #357ABD; }
-        """)
-        
-        modeler_btn.setStyleSheet("""
-            QPushButton {
-                padding: 8px 16px;
-                background: #28a745;
-                color: white;
-                border: none;
-                border-radius: 4px;
-                font-weight: bold;
-            }
-            QPushButton:hover { background: #218838; }
-        """)
-        
-        button_layout.addWidget(add_btn)
-        button_layout.addWidget(modeler_btn)
-        
-        # Assemblage
-        layout.addWidget(header)
-        layout.addWidget(search_box)
-        layout.addWidget(transformers_list)
-        layout.addLayout(button_layout)
-        
-        widget.setLayout(layout)
-        return widget
-    
-    def create_simple_workflow_widget(self):
-        """Crée un widget workflow simple et interactif"""
-        widget = QWidget()
-        layout = QVBoxLayout()
-        
-        # En-tête
-        header_layout = QHBoxLayout()
-        header = QLabel("📊 Designer de Workflow")
-        header.setFont(QFont("Arial", 14, QFont.Bold))
-        header.setStyleSheet("color: #495057;")
-        
-        # Boutons de toolbar
-        new_btn = QPushButton("🆕 Nouveau")
-        open_btn = QPushButton("📂 Ouvrir") 
-        save_btn = QPushButton("💾 Sauver")
-        run_btn = QPushButton("▶️ Exécuter")
-        
-        for btn in [new_btn, open_btn, save_btn, run_btn]:
-            btn.setStyleSheet("""
-                QPushButton {
-                    padding: 6px 12px;
-                    border: 1px solid #dee2e6;
-                    border-radius: 4px;
-                    background: white;
-                }
-                QPushButton:hover { background: #e9ecef; }
-            """)
-        
-        header_layout.addWidget(header)
-        header_layout.addStretch()
-        header_layout.addWidget(new_btn)
-        header_layout.addWidget(open_btn)
-        header_layout.addWidget(save_btn)
-        header_layout.addWidget(run_btn)
-        
-        # Zone principale avec splitter
-        main_splitter = QSplitter(Qt.Horizontal)
-        
-        # Canvas interactif
-        canvas_widget = QWidget()
-        canvas_layout = QVBoxLayout()
-        
-        canvas_info = QLabel("🎨 Zone de Workflow Interactive")
-        canvas_info.setAlignment(Qt.AlignCenter)
-        canvas_info.setStyleSheet("""
-            QLabel {
-                padding: 40px;
-                border: 2px dashed #dee2e6;
-                border-radius: 8px;
-                background: #f8f9fa;
-                font-size: 16px;
-                color: #6c757d;
-            }
-        """)
-        
-        # Boutons de test interactifs
-        canvas_buttons = QHBoxLayout()
-        add_input_btn = QPushButton("📥 Ajouter Input")
-        add_transform_btn = QPushButton("⚙️ Ajouter Transform")
-        add_output_btn = QPushButton("📤 Ajouter Output")
-        
-        for btn in [add_input_btn, add_transform_btn, add_output_btn]:
-            btn.setStyleSheet("""
-                QPushButton {
-                    padding: 8px 16px;
-                    border: 2px solid #4A90E2;
-                    border-radius: 6px;
-                    background: white;
-                    color: #4A90E2;
-                    font-weight: bold;
-                }
-                QPushButton:hover {
-                    background: #4A90E2;
-                    color: white;
-                }
-            """)
-        
-        canvas_buttons.addWidget(add_input_btn)
-        canvas_buttons.addWidget(add_transform_btn)
-        canvas_buttons.addWidget(add_output_btn)
-        
-        canvas_layout.addWidget(canvas_info)
-        canvas_layout.addLayout(canvas_buttons)
-        canvas_widget.setLayout(canvas_layout)
-        
-        # Panneau de propriétés
-        props_widget = QWidget()
-        props_widget.setMaximumWidth(250)
-        props_layout = QVBoxLayout()
-        
-        props_title = QLabel("⚙️ Propriétés")
-        props_title.setFont(QFont("Arial", 12, QFont.Bold))
-        
-        props_info = QTextEdit()
-        props_info.setPlainText("Sélectionnez un élément du workflow pour voir ses propriétés.\n\nActions disponibles:\n• Glisser-déposer des transformers\n• Connecter les éléments\n• Configurer les paramètres")
-        props_info.setMaximumHeight(200)
-        
-        # Stats du workflow
-        stats_group = QGroupBox("📊 Statistiques")
-        stats_layout = QVBoxLayout()
-        stats_layout.addWidget(QLabel("Nœuds: 3"))
-        stats_layout.addWidget(QLabel("Connexions: 2"))
-        stats_layout.addWidget(QLabel("Status: ✅ Valide"))
-        stats_group.setLayout(stats_layout)
-        
-        props_layout.addWidget(props_title)
-        props_layout.addWidget(props_info)
-        props_layout.addWidget(stats_group)
-        props_layout.addStretch()
-        props_widget.setLayout(props_layout)
-        
-        # Assemblage
-        main_splitter.addWidget(canvas_widget)
-        main_splitter.addWidget(props_widget)
-        main_splitter.setSizes([600, 250])
-        
-        layout.addLayout(header_layout)
-        layout.addWidget(main_splitter)
-        
-        widget.setLayout(layout)
-        return widget
     
     def create_simple_processing_widget(self):
         """Crée un widget processing simple et interactif"""
@@ -1409,32 +1268,7 @@ class UnifiedGISENGINEInterface(QMainWindow):
         
         # Zone de résultats
         results_area = QTextEdit()
-        results_area.setPlainText("""🔍 Scanner Processing QGIS
-        
-📋 Algorithmes disponibles:
-
-📁 Vector geometry:
-  • native:buffer - Crée des zones tampons
-  • native:centroid - Calcule les centroïdes
-  • native:convexhull - Enveloppe convexe
-  
-📁 Vector overlay:
-  • native:clip - Découpe des entités
-  • native:intersection - Intersection de couches
-  • native:union - Union de géométries
-  
-📁 Raster analysis:
-  • gdal:aspect - Calcul d'exposition
-  • gdal:slope - Calcul de pente
-  • native:rastercalculator - Calculatrice raster
-  
-📁 Database:
-  • native:postgisexecutesql - Exécute du SQL
-  • native:spatialindex - Index spatial
-  
-✅ {scan_count} algorithmes trouvés
-🔧 Prêt pour intégration dans le workflow
-        """.format(scan_count=25))
+        results_area.setPlainText("""🔍 Scanner Processing QGIS\n        \n📋 Algorithmes disponibles:\n\n📁 Vector geometry:\n  • native:buffer - Crée des zones tampons\n  • native:centroid - Calcule les centroïdes\n  • native:convexhull - Enveloppe convexe\n  \n📁 Vector overlay:\n  • native:clip - Découpe des entités\n  • native:intersection - Intersection de couches\n  • native:union - Union de géométries\n  \n📁 Raster analysis:\n  • gdal:aspect - Calcul d'exposition\n  • gdal:slope - Calcul de pente\n  • native:rastercalculator - Calculatrice raster\n  \n📁 Database:\n  • native:postgisexecutesql - Exécute du SQL\n  • native:spatialindex - Index spatial\n  \n✅ {scan_count} algorithmes trouvés\n🔧 Prêt pour intégration dans le workflow\n        """.format(scan_count=25))
         
         results_area.setStyleSheet("""
             QTextEdit {
@@ -1648,7 +1482,65 @@ class UnifiedGISENGINEInterface(QMainWindow):
         <p><i>🔧 Plugin en développement actif</i></p>
         """
         
-        QMessageBox.about(self, "À propos", about_text)
+        QMessageBox.information(self, "À propos", about_text)
+
+    def clear_workflow_canvas(self):
+        """Vide le canvas du workflow"""
+        try:
+            if hasattr(self, 'workflow_scene') and self.workflow_scene:
+                # Supprimer tous les éléments de la scène
+                for item in self.workflow_scene.items():
+                    if isinstance(item, (WorkflowNode, Connection)):
+                        item.delete() # Appelle la méthode delete() de l'élément
+                self.workflow_scene.nodes = [] # Réinitialiser la liste des nœuds de la scène
+                self.status_message.setText("Canvas vidé")
+                self.on_elements_deleted() # Mettre à jour les statistiques
+        except Exception as e:
+            print(f"Erreur vidage canvas: {e}")
+    
+    def add_quick_input(self):
+        """Ajoute un input rapide"""
+        try:
+            if hasattr(self, 'workflow_view') and hasattr(self, 'workflow_scene'):
+                center = self.workflow_view.mapToScene(self.workflow_view.rect().center())
+                node = WorkflowNode("Input", "General", "📥", center.x(), center.y())
+                self.workflow_scene.addItem(node)
+                self.workflow_scene.nodes.append(node) # Ajouter à la liste des nœuds de la scène
+                self.status_message.setText("Input ajouté")
+                self.on_workflow_node_added("Input") # Mettre à jour les statistiques
+        except Exception as e:
+            print(f"Erreur ajout input: {e}")
+    
+    def add_quick_output(self):
+        """Ajoute un output rapide"""
+        try:
+            if hasattr(self, 'workflow_scene') and self.workflow_scene:
+                center = self.workflow_view.mapToScene(self.workflow_view.rect().center())
+                node = WorkflowNode("Output", "General", "📤", center.x(), center.y())
+                self.workflow_scene.addItem(node)
+                self.workflow_scene.nodes.append(node) # Ajouter à la liste des nœuds de la scène
+                self.status_message.setText("Output ajouté")
+                self.on_workflow_node_added("Output") # Mettre à jour les statistiques
+        except Exception as e:
+            print(f"Erreur ajout output: {e}")
+    
+    def show_quick_add_dialog(self):
+        """Affiche le dialogue d'ajout rapide"""
+        try:
+            from PyQt5.QtWidgets import QInputDialog
+            text, ok = QInputDialog.getText(self, 'Ajout rapide', 'Nom du transformer:')
+            if ok and text:
+                self.status_message.setText(f"Transformer '{text}' ajouté")
+        except Exception as e:
+            print(f"Erreur dialogue: {e}")
+
+    def on_elements_deleted(self):
+        """Met à jour les statistiques après suppression d'éléments."""
+        node_count = len([item for item in self.workflow_scene.items() if isinstance(item, WorkflowNode)])
+        connection_count = len([item for item in self.workflow_scene.items() if isinstance(item, Connection)])
+        self.workflow_node_count.setText(f"Nœuds: {node_count}")
+        self.workflow_connections.setText(f"Connexions: {connection_count}")
+        self.status_message.setText("Éléments supprimés")
 
 def main():
     """Fonction de test standalone"""
