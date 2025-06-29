@@ -1,0 +1,23 @@
+[general]
+name=GISENGINE
+qgisMinimumVersion=3.28
+description=Plugin QGIS offrant une interface moderne pour chaîner des traitements géomatiques avec les algorithmes Processing existants
+version=0.1.0
+author=Youcef
+email=yadda@ext.nge.fr
+
+about=GISENGINE est un plugin qui offre une interface moderne et intuitive pour chaîner des traitements géomatiques dans QGIS. Il s'appuie sur les algorithmes du Processing Framework existants et propose un système de workflow graphique avec mapping attributaire intelligent.
+
+tracker=https://github.com/votre-repo/gisengine-plugin/issues
+repository=https://github.com/votre-repo/gisengine-plugin
+hasProcessingProvider=no
+changelog=Version 0.1.0 - Interface prototype - Scanner algorithmes Processing - Workflow mapper avec connexions graphiques - Système de mapping attributaire
+
+tags=processing,workflow,automation,geoprocessing,transformer
+
+homepage=https://github.com/votre-repo/gisengine-plugin
+category=Analysis
+experimental=True
+
+deprecated=False
+server=False
