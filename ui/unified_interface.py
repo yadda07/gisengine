@@ -570,7 +570,7 @@ class UnifiedGISENGINEInterface(QMainWindow):
         
     def init_ui(self):
         """Initialise l'interface utilisateur"""
-        self.setWindowTitle("🛠️ GISENGINE - Interface Unifiée")
+        self.setWindowTitle("GISENGINE - Interface Unifiée")
         self.setGeometry(50, 50, 1600, 1000)
         
         # Menu principal
@@ -644,21 +644,16 @@ class UnifiedGISENGINEInterface(QMainWindow):
         toolbar.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
         
         # Navigation rapide entre onglets
-        tab1_action = QAction('🛠️ Transformers', self)
-        tab1_action.setToolTip('Bibliothèque de Transformers')
+        tab1_action = QAction('📊 Workflow', self)
+        tab1_action.setToolTip('Designer de Workflow')
         tab1_action.triggered.connect(lambda: self.tabs.setCurrentIndex(0))
         
-        tab2_action = QAction('📊 Workflow', self)
-        tab2_action.setToolTip('Designer de Workflow')
+        tab2_action = QAction('⚙️ Processing', self)
+        tab2_action.setToolTip('Scanner Processing QGIS')
         tab2_action.triggered.connect(lambda: self.tabs.setCurrentIndex(1))
-        
-        tab3_action = QAction('⚙️ Processing', self)
-        tab3_action.setToolTip('Scanner Processing QGIS')
-        tab3_action.triggered.connect(lambda: self.tabs.setCurrentIndex(2))
         
         toolbar.addAction(tab1_action)
         toolbar.addAction(tab2_action)
-        toolbar.addAction(tab3_action)
         
         toolbar.addSeparator()
         
@@ -737,7 +732,7 @@ class UnifiedGISENGINEInterface(QMainWindow):
         header_frame.setLayout(layout)
         
         # Titre principal
-        title = QLabel("🛠️ GISENGINE")
+        title = QLabel("GISENGINE")
         title.setFont(QFont("Arial", 18, QFont.Bold))
         title.setStyleSheet("color: white; margin: 10px;")
         
@@ -760,146 +755,15 @@ class UnifiedGISENGINEInterface(QMainWindow):
     
     def setup_components(self):
         """Configure les composants dans les onglets"""
-        # Onglet 1: Bibliothèque de Transformers
-        self.setup_transformers_tab()
-        
-        # Onglet 2: Workflow Designer  
+        # Onglet 1: Workflow Designer  
         self.setup_workflow_tab()
         
-        # Onglet 3: Scanner Processing
+        # Onglet 2: Scanner Processing
         self.setup_processing_tab()
     
-    def setup_transformers_tab(self):
-        """Configure l'onglet des transformers avec drag and drop"""
-        try:
-            # Créer directement le widget transformers avec drag
-            transformers_widget = self.create_draggable_transformers_widget()
-            self.tabs.addTab(transformers_widget, "🛠️ Bibliothèque Transformers")
-                
-        except Exception as e:
-            error_widget = self.create_error_widget(f"Erreur transformers: {str(e)}")
-            self.tabs.addTab(error_widget, "🛠️ Transformers (Erreur)")
+
     
-    def create_draggable_transformers_widget(self):
-        """Crée un widget transformers avec drag and drop"""
-        widget = QWidget()
-        layout = QVBoxLayout()
-        
-        # En-tête
-        header = QLabel("🛠️ Bibliothèque de Transformers")
-        header.setFont(QFont("Arial", 14, QFont.Bold))
-        header.setStyleSheet("color: #495057; margin: 10px 0;")
-        
-        # Instructions pour le drag and drop
-        instructions = QLabel("💡 Glissez un transformer vers l'onglet 'Workflow Designer' pour l'ajouter au canvas")
-        instructions.setStyleSheet("""
-            QLabel {
-                color: #6c757d; 
-                font-style: italic; 
-                background: #e8f5e8; 
-                padding: 10px; 
-                border-radius: 6px; 
-                border-left: 4px solid #28a745;
-                margin: 5px 0;
-            }
-        """)
-        instructions.setWordWrap(True)
-        
-        # Zone de recherche
-        self.search_box = QLineEdit()
-        self.search_box.setPlaceholderText("🔍 Rechercher un transformer...")
-        self.search_box.textChanged.connect(self.filter_transformers)
-        self.search_box.setStyleSheet("""
-            QLineEdit {
-                padding: 10px 15px;
-                border: 2px solid #dee2e6;
-                border-radius: 8px;
-                font-size: 12px;
-                background: white;
-            }
-            QLineEdit:focus {
-                border-color: #4A90E2;
-            }
-        """)
-        
-        # Liste des transformers avec drag enabled
-        self.transformer_list = DraggableTransformerList()
-        
-        # Remplir la liste des transformers
-        self.populate_draggable_transformers()
-        
-        # Informations et actions
-        info_layout = QHBoxLayout()
-        
-        info_label = QLabel(f"📦 {self.transformer_list.count()} transformers disponibles")
-        info_label.setStyleSheet("color: #6c757d; font-size: 11px;")
-        
-        modeler_btn = QPushButton("🛠️ Ouvrir Processing Modeler")
-        modeler_btn.setStyleSheet("""
-            QPushButton {
-                background: #28a745;
-                color: white;
-                border: none;
-                padding: 8px 16px;
-                border-radius: 6px;
-                font-weight: bold;
-            }
-            QPushButton:hover { background: #218838; }
-        """)
-        
-        info_layout.addWidget(info_label)
-        info_layout.addStretch()
-        info_layout.addWidget(modeler_btn)
-        
-        # Assemblage
-        layout.addWidget(header)
-        layout.addWidget(instructions)
-        layout.addWidget(self.search_box)
-        layout.addWidget(self.transformer_list)
-        layout.addLayout(info_layout)
-        
-        widget.setLayout(layout)
-        return widget
-    
-    def populate_draggable_transformers(self):
-        """Remplit la liste des transformers avec drag and drop"""
-        transformers_data = [
-            ("Buffer", "Vector", "🔲", "Crée une zone tampon autour des géométries"),
-            ("Clip", "Vector", "✂️", "Découpe les entités avec un masque"),
-            ("Merge", "Vector", "🔗", "Fusionne plusieurs couches vectorielles"),
-            ("Dissolve", "Vector", "🫧", "Dissout les géométries adjacentes"),
-            ("Reproject", "Vector", "🌍", "Change la projection des données"),
-            ("Field Calculator", "Vector", "🧮", "Calcule de nouveaux champs"),
-            ("Intersection", "Vector", "∩", "Calcule l'intersection entre couches"),
-            ("Union", "Vector", "∪", "Calcule l'union de géométries"),
-            ("Difference", "Vector", "⊖", "Calcule la différence entre couches"),
-            ("Centroid", "Vector", "⊙", "Calcule les centroïdes des géométries"),
-            ("Raster Calculator", "Raster", "📊", "Effectue des calculs sur rasters"),
-            ("Warp", "Raster", "🔄", "Reprojette les données raster"),
-            ("Polygonize", "Raster", "🔷", "Convertit raster en polygones"),
-            ("Zonal Statistics", "Raster", "📈", "Calcule des statistiques par zones"),
-            ("Aspect", "Raster", "🧭", "Calcule l'exposition des pentes"),
-            ("Slope", "Raster", "📐", "Calcule la pente du terrain"),
-            ("Export Database", "Database", "🗃️", "Exporte vers une base de données"),
-            ("Join Attributes", "Database", "🔗", "Joint des attributs par clé"),
-            ("Import CSV", "Database", "📄", "Importe des données CSV"),
-            ("SQL Query", "Database", "💾", "Exécute une requête SQL")
-        ]
-        
-        for name, category, icon, description in transformers_data:
-            item = DraggableTransformerItem(name, category, icon, description)
-            self.transformer_list.addItem(item)
-    
-    def filter_transformers(self, text):
-        """Filtre les transformers selon le texte de recherche"""
-        if hasattr(self, 'transformer_list'):
-            for i in range(self.transformer_list.count()):
-                item = self.transformer_list.item(i)
-                if hasattr(item, 'transformer_name'):
-                    visible = (text.lower() in item.transformer_name.lower() or 
-                              text.lower() in item.transformer_category.lower() or
-                              text.lower() in item.transformer_description.lower())
-                    item.setHidden(not visible)
+
     
     def setup_workflow_tab(self):
         """Configure l'onglet du workflow designer avec le nouveau FME Designer"""
