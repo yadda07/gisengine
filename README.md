@@ -133,8 +133,8 @@ Ce projet est sous licence [MIT](LICENSE).
 
 ## Support
 
-- **Issues** : [GitHub Issues](https://github.com/your-repo/gisengine/issues)
-- **Documentation** : [Wiki](https://github.com/your-repo/gisengine/wiki)
+- **Issues** : [GitHub Issues](https://github.com/yadda07/gisengine/issues)
+- **Documentation** : [Wiki](https://github.com/yadda07/gisengine/wiki)
 - **Email** : youcef.geodesien@gmail.com
 
 ---
