@@ -81,16 +81,21 @@ class FMEStyleScene(QGraphicsScene):
     
     def handle_port_click(self, port):
         """Gérer le clic sur un port"""
+        print(f"Port clicked: {port.port_type}, is_connecting: {self.is_connecting}")
+        
         if not self.is_connecting:
             # Commencer une nouvelle connexion depuis un port de sortie
             if port.port_type == "output":
+                print(f"Starting connection from output port")
                 self.start_connection(port)
         else:
             # Terminer la connexion sur un port d'entrée
             if port.port_type == "input" and self.connection_start_port:
+                print(f"Finishing connection to input port")
                 self.finish_connection(port)
             else:
                 # Annuler si on clique sur un mauvais type de port
+                print(f"Canceling connection - wrong port type")
                 self.cleanup_temp_connection()
     
     def start_connection(self, start_port):
@@ -110,10 +115,16 @@ class FMEStyleScene(QGraphicsScene):
     
     def finish_connection(self, end_port):
         """Terminer la connexion"""
+        print(f"Attempting to finish connection from {self.connection_start_port.port_type} to {end_port.port_type}")
+        
         if self.can_connect(self.connection_start_port, end_port):
+            print("Connection allowed - creating final connection")
             # Créer la connexion finale
             connection = Connection(self.connection_start_port, end_port)
             self.addItem(connection)
+            print("Connection created and added to scene")
+        else:
+            print("Connection not allowed")
         
         self.cleanup_temp_connection()
     
@@ -165,21 +176,31 @@ class FMEStyleScene(QGraphicsScene):
     def can_connect(self, start_port, end_port):
         """Vérifier si deux ports peuvent être connectés"""
         if not start_port or not end_port:
+            print("Cannot connect: missing port")
             return False
         
-        # Vérifier les types de ports
+        # Vérifier les types de ports (output vers input)
         if start_port.port_type == end_port.port_type:
+            print(f"Cannot connect: same port types ({start_port.port_type})")
+            return False
+            
+        # S'assurer que c'est output vers input
+        if start_port.port_type != "output" or end_port.port_type != "input":
+            print(f"Cannot connect: wrong direction ({start_port.port_type} -> {end_port.port_type})")
             return False
         
         # Vérifier qu'ils ne sont pas sur le même nœud
         if start_port.parent_node == end_port.parent_node:
+            print("Cannot connect: same node")
             return False
         
         # Vérifier qu'il n'y a pas déjà une connexion
         for connection in end_port.connections:
             if connection.start_port == start_port:
+                print("Cannot connect: connection already exists")
                 return False
         
+        print("Connection allowed")
         return True
     
     def cleanup_temp_connection(self):
