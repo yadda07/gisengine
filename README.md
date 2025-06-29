@@ -5,7 +5,7 @@
 
 # GISENGINE - QGIS Plugin
 
-**GISENGINE** is a modern QGIS plugin that aims to replicate the principles of geoprocessing workbenches (like FME) by leveraging the existing algorithms from the QGIS Processing Framework.
+**GISENGINE** is a modern QGIS plugin that aims to replicate the principles of geoprocessing workbenches by leveraging the existing algorithms from the QGIS Processing Framework.
 
 > ⚠️ **Status**: This project is currently in active development. The core workflow designer is functional but the plugin is not yet ready for production use. Contributors are welcome to help complete the implementation.
 
@@ -14,7 +14,8 @@
 ### ✅ Implemented Components
 
 #### Professional Workflow Designer
-- **Modern FME-style interface** with clean, professional design
+
+- **Interface** with clean, professional design
 - **Interactive canvas** with grid-based node placement
 - **Curvilinear connections** with Bézier curves and directional arrows
 - **Professional workflow nodes** with input/output ports
@@ -22,19 +23,21 @@
 - **Real-time connection system** with temporary connection preview
 
 #### User Interface
+
 - **Unified interface** with tabbed navigation
 - **Workflow Designer tab** - Main visual workflow editor
 - **Scanner Processing tab** - QGIS Processing Toolbox integration
-- **Professional styling** without emojis, inspired by FME
 
 ### 🚧 In Development
 
 #### Core Engine (Placeholder)
+
 - **Algorithm scanner** - Dynamic discovery of QGIS Processing algorithms
 - **Workflow engine** - Execution engine for created workflows
 - **Mapping engine** - Data transformation and routing
 
 #### Advanced Features (Planned)
+
 - **Drag-and-drop** workflow creation from search panel
 - **Step-by-step execution** with detailed logs
 - **Save/load** workflow functionality
@@ -118,6 +121,7 @@ gisengine/
 #### ✅ Implemented Classes
 
 **Workflow Designer:**
+
 - `FMEWorkflowDesigner`: Main workflow designer interface
 - `FMEStyleScene`: Graphics scene with grid and connection management
 - `ProfessionalWorkflowNode`: Workflow nodes with ports
@@ -126,6 +130,7 @@ gisengine/
 - `ProfessionalSearchPanel`: Component search and filtering
 
 **Main Interface:**
+
 - `GISENGINEPlugin`: Main QGIS plugin entry point
 - `UnifiedGISENGINEInterface`: Tabbed main interface
 - `QGISIntegration`: QGIS Processing framework integration
@@ -161,6 +166,7 @@ ln -s /path/to/gisengine ~/.local/share/QGIS/QGIS3/profiles/default/python/plugi
 ### Development Status
 
 #### ✅ Completed Components
+
 - **Workflow Designer UI** - Fully functional visual editor
 - **Connection System** - Complete with Bézier curves and arrows
 - **Search Panel** - Component filtering and autocompletion
@@ -168,11 +174,13 @@ ln -s /path/to/gisengine ~/.local/share/QGIS/QGIS3/profiles/default/python/plugi
 - **QGIS Integration** - Plugin framework and UI integration
 
 #### 🚧 In Progress
+
 - **Core Engine Implementation** - Algorithm execution logic
 - **Drag-and-Drop** - From search panel to canvas
 - **Workflow Persistence** - Save/load functionality
 
 #### 📋 TODO
+
 - **Algorithm Scanner** - Dynamic QGIS Processing discovery
 - **Workflow Execution** - Run created workflows
 - **Data Mapping** - Input/output parameter handling
@@ -195,9 +203,9 @@ python -m pytest tests/
 
 ### Phase 1: Core Implementation (Current)
 
-- [x] **Workflow Designer** - Visual workflow editor
-- [x] **Connection System** - Node-to-node connections
-- [x] **Search Panel** - Component discovery
+- [X] **Workflow Designer** - Visual workflow editor
+- [X] **Connection System** - Node-to-node connections
+- [X] **Search Panel** - Component discovery
 - [ ] **Algorithm Scanner** - QGIS Processing integration
 - [ ] **Workflow Engine** - Execution framework
 - [ ] **Data Mapping** - Parameter handling
@@ -232,6 +240,7 @@ python -m pytest tests/
 ### How to Contribute
 
 #### 🎯 Priority Areas
+
 1. **Core Engine Implementation** - Algorithm scanner and workflow engine
 2. **Drag-and-Drop Functionality** - Component placement from search panel
 3. **Workflow Persistence** - Save/load workflows to/from files
@@ -239,6 +248,7 @@ python -m pytest tests/
 5. **Error Handling** - Robust error management and user feedback
 
 #### 🛠️ Technical Skills Needed
+
 - **Python** programming
 - **PyQt5** GUI development
 - **QGIS Plugin** development experience
@@ -246,6 +256,7 @@ python -m pytest tests/
 - **Git** version control
 
 #### 📋 Getting Started
+
 1. **Fork** the repository
 2. **Set up** development environment (see Development section)
 3. **Pick an issue** or propose a new feature
@@ -253,11 +264,13 @@ python -m pytest tests/
 5. **Submit a pull request** with detailed description
 
 #### 🐛 Bug Reports
+
 - Use GitHub Issues to report bugs
 - Include QGIS version, OS, and steps to reproduce
 - Attach screenshots if relevant
 
 #### 💡 Feature Requests
+
 - Discuss new features in GitHub Issues first
 - Consider implementation complexity
 - Align with project goals and architecture
