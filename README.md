@@ -106,7 +106,7 @@ gisengine/
 
 ```bash
 # Clone the project
-git clone <repository-url>
+git clone https://github.com/yadda07/gisengine.git
 
 # Create symbolic link to QGIS directory
 ln -s /path/to/gisengine ~/.local/share/QGIS/QGIS3/profiles/default/python/plugins/
