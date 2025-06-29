@@ -5,102 +5,145 @@
 
 # GISENGINE - QGIS Plugin
 
-**GISENGINE** is a modern QGIS plugin that replicates the principles of geoprocessing workbenches by leveraging the existing algorithms from the QGIS Processing Framework.
+**GISENGINE** is a modern QGIS plugin that aims to replicate the principles of geoprocessing workbenches (like FME) by leveraging the existing algorithms from the QGIS Processing Framework.
+
+> ⚠️ **Status**: This project is currently in active development. The core workflow designer is functional but the plugin is not yet ready for production use. Contributors are welcome to help complete the implementation.
 
 ## Features
 
-### Modern Interface
+### ✅ Implemented Components
 
-- **Unified interface** with tabs for smooth navigation
-- **Interactive canvas** for visual workflow creation
-- **Smart search** with category filtering
-- **Organized transformer library** easily accessible
+#### Professional Workflow Designer
+- **Modern FME-style interface** with clean, professional design
+- **Interactive canvas** with grid-based node placement
+- **Curvilinear connections** with Bézier curves and directional arrows
+- **Professional workflow nodes** with input/output ports
+- **Smart search panel** with autocompletion and filtering
+- **Real-time connection system** with temporary connection preview
 
-### Advanced Features
+#### User Interface
+- **Unified interface** with tabbed navigation
+- **Workflow Designer tab** - Main visual workflow editor
+- **Scanner Processing tab** - QGIS Processing Toolbox integration
+- **Professional styling** without emojis, inspired by FME
 
-- **Dynamic scanner** of QGIS Processing Toolbox
-- **Drag-and-drop** to create workflows
-- **Visual connections** between transformers
+### 🚧 In Development
+
+#### Core Engine (Placeholder)
+- **Algorithm scanner** - Dynamic discovery of QGIS Processing algorithms
+- **Workflow engine** - Execution engine for created workflows
+- **Mapping engine** - Data transformation and routing
+
+#### Advanced Features (Planned)
+- **Drag-and-drop** workflow creation from search panel
 - **Step-by-step execution** with detailed logs
 - **Save/load** workflow functionality
-
-### QGIS Integration
-
-- **Full compatibility** with QGIS algorithms
-- **Processing Modeler integration** for complex workflows
-- **Integrated QGIS project management**
+- **QGIS Processing integration** for algorithm execution
 
 ## 🔧 Installation
 
-1. Copy the `gisengine` folder to your QGIS plugins directory
-2. Enable the plugin in QGIS: **Plugins > Manage and Install Plugins**
-3. Launch GISENGINE from the **Plugins > GISENGINE** menu
+> ⚠️ **Note**: This plugin is in development and not yet ready for end-user installation.
 
-## Usage
+For **developers and contributors**:
 
-### Quick Start
+1. Clone or download the repository
+2. Copy the `gisengine` folder to your QGIS plugins directory:
+   - **Windows**: `%APPDATA%\QGIS\QGIS3\profiles\default\python\plugins\`
+   - **Linux**: `~/.local/share/QGIS/QGIS3/profiles/default/python/plugins/`
+   - **macOS**: `~/Library/Application Support/QGIS/QGIS3/profiles/default/python/plugins/`
+3. Enable the plugin in QGIS: **Plugins > Manage and Install Plugins**
+4. Launch GISENGINE from the **Plugins > GISENGINE** menu
+
+## Current Usage
+
+### Workflow Designer Testing
 
 1. **Open GISENGINE** from the Plugins menu
-2. **Explore the transformer library** in the left panel
-3. **Drag and drop** transformers onto the canvas
-4. **Connect transformers** by clicking on input/output ports
-5. **Execute your workflow** with the Play button
+2. **Navigate to Workflow Designer tab**
+3. **Test connection creation**:
+   - Right-click on canvas to add sample nodes
+   - Click on blue output ports to start connections
+   - Click on green input ports to complete connections
+   - Use right-click or Escape to cancel connections
+4. **Use search panel** to filter and find components
 
-### Keyboard Shortcuts
+### Available Features
 
-- **Space**: Quick transformer search
-- **I**: Add input transformer
-- **O**: Add output transformer
-- **Ctrl+S**: Save workflow
-- **Ctrl+O**: Open workflow
+- ✅ **Visual workflow canvas** with professional grid
+- ✅ **Node creation** and positioning
+- ✅ **Connection system** between workflow nodes
+- ✅ **Search and filtering** of components
+- ⚠️ **Algorithm execution** - Not yet implemented
+- ⚠️ **Save/Load workflows** - Not yet implemented
 
 ## Architecture
 
-### Modular Structure
+### Current Project Structure
 
 ```
 gisengine/
-├── __init__.py             # Package initialization
-├── gisengine_plugin.py     # Main plugin file
-├── plugin.py               # Plugin entry point
-├── metadata.txt            # QGIS metadata
-├── ui/                     # User interfaces
-│   ├── unified_interface.py
-│   ├── workflow_mapper.py
-│   ├── qgis_plugin_ui.py
-│   └── qgis_integration.py
-├── core/                   # Business logic
-│   ├── algorithm_scanner.py
-│   ├── workflow_engine.py
-│   └── mapping_engine.py
-├── resources/              # Static resources
-│   ├── icons/
-│   │   └── icon.svg
-│   └── styles/
-├── tests/                  # Unit tests
+├── __init__.py                 # Package initialization
+├── gisengine_plugin.py         # Main plugin class (8.6KB)
+├── metadata.txt                # QGIS plugin metadata
+├── ui/                         # User Interface Layer
+│   ├── unified_interface.py    # Main unified interface (59KB)
+│   ├── workflow_mapper.py      # Workflow mapping logic (107KB)
+│   ├── qgis_plugin_ui.py       # QGIS plugin UI integration (17KB)
+│   ├── qgis_integration.py     # QGIS Processing integration (28KB)
+│   └── workflow/               # Workflow Designer Components
+│       ├── __init__.py         # Module exports
+│       ├── fme_workflow_designer.py  # Main workflow designer (14KB)
+│       ├── workflow_scene.py   # Graphics scene management (11KB)
+│       ├── workflow_nodes.py   # Node and connection classes (11KB)
+│       └── search_panel.py     # Search and filtering panel (11KB)
+├── core/                       # Business Logic (Placeholder)
+│   ├── algorithm_scanner.py    # QGIS algorithm discovery
+│   ├── workflow_engine.py      # Workflow execution engine
+│   └── mapping_engine.py       # Data transformation engine
+├── tests/                      # Unit Tests
 │   ├── test_integration.py
 │   ├── test_ui.py
 │   └── test_workflow.py
-├── CHANGELOG.md            # Version history
-├── CODE_OF_CONDUCT.md      # Community guidelines
-├── MIT.LICENSE             # License file
-├── SECURITY.MD             # Security policy
-└── README.md               # This file
+├── resources/                  # Static Resources
+│   └── icons/
+├── CHANGELOG.md               # Version history
+├── CODE_OF_CONDUCT.md         # Community guidelines
+├── MIT.LICENSE                # License file
+├── SECURITY.MD                # Security policy
+└── README.md                  # This file
 ```
 
-### Main Classes
+### Key Components
 
-- `GISENGINEPlugin`: Main plugin class
-- `UnifiedGISENGINEInterface`: Unified user interface
-- `WorkflowTestWindow`: Workflow testing window
+#### ✅ Implemented Classes
+
+**Workflow Designer:**
+- `FMEWorkflowDesigner`: Main workflow designer interface
+- `FMEStyleScene`: Graphics scene with grid and connection management
+- `ProfessionalWorkflowNode`: Workflow nodes with ports
+- `ConnectionPort`: Input/output ports for connections
+- `Connection`: Bézier curve connections with arrows
+- `ProfessionalSearchPanel`: Component search and filtering
+
+**Main Interface:**
+- `GISENGINEPlugin`: Main QGIS plugin entry point
+- `UnifiedGISENGINEInterface`: Tabbed main interface
+- `QGISIntegration`: QGIS Processing framework integration
+
+#### 🚧 Placeholder Classes (Core)
+
+- `AlgorithmScanner`: Dynamic QGIS algorithm discovery
+- `WorkflowEngine`: Workflow execution and processing
+- `MappingEngine`: Data transformation and routing
 
 ## 🛠️ Development
 
 ### Prerequisites
 
-- Python >= 3.9
-- QGIS >= 3.28
-- PyQt5 or PyQt6
+- **Python** >= 3.9
+- **QGIS** >= 3.28
+- **PyQt5** (QGIS standard)
+- **Git** for version control
 
 ### Development Setup
 
@@ -108,39 +151,118 @@ gisengine/
 # Clone the project
 git clone https://github.com/yadda07/gisengine.git
 
-# Create symbolic link to QGIS directory
+# Windows - Create symbolic link
+mklink /D "%APPDATA%\QGIS\QGIS3\profiles\default\python\plugins\gisengine" "C:\path\to\gisengine"
+
+# Linux/macOS - Create symbolic link
 ln -s /path/to/gisengine ~/.local/share/QGIS/QGIS3/profiles/default/python/plugins/
 ```
+
+### Development Status
+
+#### ✅ Completed Components
+- **Workflow Designer UI** - Fully functional visual editor
+- **Connection System** - Complete with Bézier curves and arrows
+- **Search Panel** - Component filtering and autocompletion
+- **Professional Styling** - Modern FME-inspired interface
+- **QGIS Integration** - Plugin framework and UI integration
+
+#### 🚧 In Progress
+- **Core Engine Implementation** - Algorithm execution logic
+- **Drag-and-Drop** - From search panel to canvas
+- **Workflow Persistence** - Save/load functionality
+
+#### 📋 TODO
+- **Algorithm Scanner** - Dynamic QGIS Processing discovery
+- **Workflow Execution** - Run created workflows
+- **Data Mapping** - Input/output parameter handling
+- **Error Handling** - Robust error management
+- **Documentation** - User and developer guides
 
 ### Testing
 
 ```bash
-# Run unit tests
-python -m pytest tests/
+# Manual testing in QGIS
+# 1. Load plugin in QGIS
+# 2. Open GISENGINE interface
+# 3. Test workflow designer functionality
 
-# Integration tests
-python tests/test_integration.py
+# Unit tests (when implemented)
+python -m pytest tests/
 ```
 
-## Roadmap
+## Development Roadmap
 
-### Version 1.1
+### Phase 1: Core Implementation (Current)
 
-- [ ] User interface improvements
-- [ ] New custom transformers
-- [ ] Export to Processing Modeler
-- [ ] Execution history
+- [x] **Workflow Designer** - Visual workflow editor
+- [x] **Connection System** - Node-to-node connections
+- [x] **Search Panel** - Component discovery
+- [ ] **Algorithm Scanner** - QGIS Processing integration
+- [ ] **Workflow Engine** - Execution framework
+- [ ] **Data Mapping** - Parameter handling
 
-### Version 1.2
+### Phase 2: Functionality (Next)
 
-- [ ] Multilingual support (FR/EN)
-- [ ] Workflow templates
-- [ ] Web services integration
-- [ ] Batch processing mode
+- [ ] **Drag-and-Drop** - Component placement
+- [ ] **Workflow Execution** - Run workflows
+- [ ] **Save/Load** - Workflow persistence
+- [ ] **Error Handling** - Robust error management
+- [ ] **Progress Tracking** - Execution monitoring
+
+### Phase 3: Enhancement (Future)
+
+- [ ] **Export to Processing Modeler** - QGIS integration
+- [ ] **Workflow Templates** - Predefined workflows
+- [ ] **Batch Processing** - Multiple dataset processing
+- [ ] **Multilingual Support** - FR/EN localization
+- [ ] **Plugin Marketplace** - Custom transformers
+
+### Phase 4: Advanced Features (Long-term)
+
+- [ ] **Web Services Integration** - Remote processing
+- [ ] **Collaborative Workflows** - Team sharing
+- [ ] **Workflow Versioning** - Change tracking
+- [ ] **Performance Optimization** - Large dataset handling
 
 ## Contributing
 
-Contributions are welcome! Please see the `CONTRIBUTING.md` file for more information.
+**Contributors are welcome!** This project needs help to complete the implementation.
+
+### How to Contribute
+
+#### 🎯 Priority Areas
+1. **Core Engine Implementation** - Algorithm scanner and workflow engine
+2. **Drag-and-Drop Functionality** - Component placement from search panel
+3. **Workflow Persistence** - Save/load workflows to/from files
+4. **QGIS Processing Integration** - Execute QGIS algorithms
+5. **Error Handling** - Robust error management and user feedback
+
+#### 🛠️ Technical Skills Needed
+- **Python** programming
+- **PyQt5** GUI development
+- **QGIS Plugin** development experience
+- **QGIS Processing Framework** knowledge
+- **Git** version control
+
+#### 📋 Getting Started
+1. **Fork** the repository
+2. **Set up** development environment (see Development section)
+3. **Pick an issue** or propose a new feature
+4. **Create a branch** for your changes
+5. **Submit a pull request** with detailed description
+
+#### 🐛 Bug Reports
+- Use GitHub Issues to report bugs
+- Include QGIS version, OS, and steps to reproduce
+- Attach screenshots if relevant
+
+#### 💡 Feature Requests
+- Discuss new features in GitHub Issues first
+- Consider implementation complexity
+- Align with project goals and architecture
+
+See `CONTRIBUTING.md` for detailed guidelines (when available).
 
 ## License
 

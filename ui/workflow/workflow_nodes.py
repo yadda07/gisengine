@@ -51,6 +51,16 @@ class ConnectionPort(QGraphicsEllipseItem):
         self.setScale(1.0)
         self.update()
     
+    def add_connection(self, connection):
+        """Ajouter une connexion à ce port"""
+        if connection not in self.connections:
+            self.connections.append(connection)
+    
+    def remove_connection(self, connection):
+        """Supprimer une connexion de ce port"""
+        if connection in self.connections:
+            self.connections.remove(connection)
+    
     def mousePressEvent(self, event):
         """Début de création de connexion"""
         if event.button() == Qt.LeftButton:
@@ -81,11 +91,16 @@ class Connection(QGraphicsPathItem):
         
         # Configuration
         self.setFlag(QGraphicsItem.ItemIsSelectable, True)
-        self.setZValue(-1)
+        self.setZValue(1)  # Au-dessus des nœuds
         
         # Style professionnel
-        self.pen = QPen(QColor("#4A90E2"), 2)
+        self.pen_normal = QPen(QColor("#4A90E2"), 2)
+        self.pen_normal.setCapStyle(Qt.RoundCap)
         self.pen_selected = QPen(QColor("#ffc107"), 3)
+        self.pen_selected.setCapStyle(Qt.RoundCap)
+        
+        # Appliquer le style par défaut
+        self.setPen(self.pen_normal)
         
         # Enregistrer la connexion dans les ports
         self.start_port.add_connection(self)
@@ -137,7 +152,7 @@ class Connection(QGraphicsPathItem):
         if self.isSelected():
             painter.setPen(self.pen_selected)
         else:
-            painter.setPen(self.pen)
+            painter.setPen(self.pen_normal)
         
         painter.drawPath(self.path())
         
