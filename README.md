@@ -3,107 +3,122 @@
 ![Issues](https://img.shields.io/github/issues/yadda07/gisengine)
 ![Stars](https://img.shields.io/github/stars/yadda07/gisengine?style=social)
 
-# GISENGINE - Plugin QGIS
+# GISENGINE - QGIS Plugin
 
-**GISENGINE** est un plugin QGIS moderne qui reproduit le principe des workbenches de traitement géomatique en s'appuyant sur les algorithmes existants du Processing Framework de QGIS.
+**GISENGINE** is a modern QGIS plugin that replicates the principles of geoprocessing workbenches by leveraging the existing algorithms from the QGIS Processing Framework.
 
-## Fonctionnalités
+## Features
 
-### Interface Moderne
+### Modern Interface
 
-- **Interface unifiée** avec onglets pour une navigation fluide
-- **Canvas interactif** pour la création visuelle de workflows
-- **Recherche intelligente** avec filtrage par catégories
-- **Bibliothèque de transformers** organisée et accessible
+- **Unified interface** with tabs for smooth navigation
+- **Interactive canvas** for visual workflow creation
+- **Smart search** with category filtering
+- **Organized transformer library** easily accessible
 
-### Fonctionnalités Avancées
+### Advanced Features
 
-- **Scanner dynamique** de la Processing Toolbox QGIS
-- **Glisser-déposer** pour créer des workflows
-- **Connexions visuelles** entre les transformers
-- **Exécution pas-à-pas** avec logs détaillés
-- **Sauvegarde/chargement** des workflows
+- **Dynamic scanner** of QGIS Processing Toolbox
+- **Drag-and-drop** to create workflows
+- **Visual connections** between transformers
+- **Step-by-step execution** with detailed logs
+- **Save/load** workflow functionality
 
-### Intégration QGIS
+### QGIS Integration
 
-- **Compatibilité totale** avec les algorithmes QGIS
-- **Intégration Processing Modeler** pour les workflows complexes
-- **Gestion des projets** QGIS intégrée
+- **Full compatibility** with QGIS algorithms
+- **Processing Modeler integration** for complex workflows
+- **Integrated QGIS project management**
 
 ## 🔧 Installation
 
-1. Copiez le dossier `gisengine` dans votre répertoire de plugins QGIS
-2. Activez le plugin dans QGIS : **Extensions > Gestionnaire d'extensions**
-3. Lancez GISENGINE depuis le menu **Extensions > GISENGINE**
+1. Copy the `gisengine` folder to your QGIS plugins directory
+2. Enable the plugin in QGIS: **Plugins > Manage and Install Plugins**
+3. Launch GISENGINE from the **Plugins > GISENGINE** menu
 
-## Utilisation
+## Usage
 
-### Démarrage rapide
+### Quick Start
 
-1. **Ouvrez GISENGINE** depuis le menu Extensions
-2. **Explorez la bibliothèque** de transformers dans le panneau de gauche
-3. **Glissez-déposez** des transformers sur le canvas
-4. **Connectez les transformers** en cliquant sur les ports d'entrée/sortie
-5. **Exécutez votre workflow** avec le bouton Play
+1. **Open GISENGINE** from the Plugins menu
+2. **Explore the transformer library** in the left panel
+3. **Drag and drop** transformers onto the canvas
+4. **Connect transformers** by clicking on input/output ports
+5. **Execute your workflow** with the Play button
 
-### Raccourcis clavier
+### Keyboard Shortcuts
 
-- **Espace** : Recherche rapide de transformers
-- **I** : Ajouter un transformer d'entrée
-- **O** : Ajouter un transformer de sortie
-- **Ctrl+S** : Sauvegarder le workflow
-- **Ctrl+O** : Ouvrir un workflow
+- **Space**: Quick transformer search
+- **I**: Add input transformer
+- **O**: Add output transformer
+- **Ctrl+S**: Save workflow
+- **Ctrl+O**: Open workflow
 
 ## Architecture
 
-### Structure modulaire
+### Modular Structure
 
 ```
 gisengine/
-├── gisengine_plugin.py     # Plugin principal
-├── metadata.txt            # Métadonnées QGIS
-├── ui/                     # Interfaces utilisateur
+├── __init__.py             # Package initialization
+├── gisengine_plugin.py     # Main plugin file
+├── plugin.py               # Plugin entry point
+├── metadata.txt            # QGIS metadata
+├── ui/                     # User interfaces
 │   ├── unified_interface.py
 │   ├── workflow_mapper.py
-│   └── qgis_plugin_ui.py
-├── core/                   # Logique métier
+│   ├── qgis_plugin_ui.py
+│   └── qgis_integration.py
+├── core/                   # Business logic
 │   ├── algorithm_scanner.py
 │   ├── workflow_engine.py
 │   └── mapping_engine.py
-└── tests/                  # Tests unitaires
+├── resources/              # Static resources
+│   ├── icons/
+│   │   └── icon.svg
+│   └── styles/
+├── tests/                  # Unit tests
+│   ├── test_integration.py
+│   ├── test_ui.py
+│   └── test_workflow.py
+├── CHANGELOG.md            # Version history
+├── CODE_OF_CONDUCT.md      # Community guidelines
+├── MIT.LICENSE             # License file
+├── SECURITY.MD             # Security policy
+└── README.md               # This file
 ```
 
-### Classes principales
+### Main Classes
 
-- `GISENGINEPlugin` : Classe principale du plugin
-- `UnifiedGISENGINEInterface` : Interface utilisateur unifiée
-- `WorkflowTestWindow` : Fenêtre de test des workflows
+- `GISENGINEPlugin`: Main plugin class
+- `UnifiedGISENGINEInterface`: Unified user interface
+- `WorkflowTestWindow`: Workflow testing window
 
-## 🛠️ Développement
+## 🛠️ Development
 
-### Prérequis
+### Prerequisites
 
 - Python >= 3.9
 - QGIS >= 3.28
-- PyQt5 ou PyQt6
+- PyQt5 or PyQt6
 
-### Configuration de développement
+### Development Setup
 
 ```bash
-# Cloner le projet
+# Clone the project
 git clone <repository-url>
 
-# Lien symbolique vers le répertoire QGIS
+# Create symbolic link to QGIS directory
 ln -s /path/to/gisengine ~/.local/share/QGIS/QGIS3/profiles/default/python/plugins/
 ```
 
-### Tests
+### Testing
 
 ```bash
-# Exécuter les tests unitaires
+# Run unit tests
 python -m pytest tests/
 
-# Tests d'intégration
+# Integration tests
 python tests/test_integration.py
 ```
 
@@ -111,32 +126,32 @@ python tests/test_integration.py
 
 ### Version 1.1
 
-- [ ] Amélioration de l'interface utilisateur
-- [ ] Nouveaux transformers personnalisés
-- [ ] Export vers Processing Modeler
-- [ ] Historique des exécutions
+- [ ] User interface improvements
+- [ ] New custom transformers
+- [ ] Export to Processing Modeler
+- [ ] Execution history
 
 ### Version 1.2
 
-- [ ] Support multilingue (FR/EN)
-- [ ] Templates de workflows
-- [ ] Intégration avec des services web
-- [ ] Mode batch pour traitement en lot
+- [ ] Multilingual support (FR/EN)
+- [ ] Workflow templates
+- [ ] Web services integration
+- [ ] Batch processing mode
 
-## Contribution
+## Contributing
 
-Les contributions sont les bienvenues ! Consultez le fichier `CONTRIBUTING.md` pour plus d'informations.
+Contributions are welcome! Please see the `CONTRIBUTING.md` file for more information.
 
-## Licence
+## License
 
-Ce projet est sous licence [MIT](LICENSE).
+This project is licensed under the [MIT License](https://github.com/yadda07/gisengine/blob/master/MIT.LICENSE).
 
 ## Support
 
-- **Issues** : [GitHub Issues](https://github.com/yadda07/gisengine/issues)
-- **Documentation** : [Wiki](https://github.com/yadda07/gisengine/wiki)
-- **Email** : youcef.geodesien@gmail.com
+- **Issues**: [GitHub Issues](https://github.com/yadda07/gisengine/issues)
+- **Documentation**: [Wiki](https://github.com/yadda07/gisengine/wiki)
+- **Email**: youcef.geodesien@gmail.com
 
 ---
 
-*GISENGINE - Simplifiez vos workflows géomatiques avec QGIS*
+*GISENGINE - Streamline your geospatial workflows with QGIS*
