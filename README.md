@@ -1,3 +1,8 @@
+![GitHub release](https://img.shields.io/github/v/release/yadda07/gisengine)
+![License](https://img.shields.io/github/license/yadda07/gisengine)
+![Issues](https://img.shields.io/github/issues/yadda07/gisengine)
+![Stars](https://img.shields.io/github/stars/yadda07/gisengine?style=social)
+
 # GISENGINE - Plugin QGIS
 
 **GISENGINE** est un plugin QGIS moderne qui reproduit le principe des workbenches de traitement géomatique en s'appuyant sur les algorithmes existants du Processing Framework de QGIS.
