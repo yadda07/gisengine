@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-GISEngine Workflow Mapper - Modern FME-Style Interface
-Interface de création de workflows visuels moderne avec drag & drop fluide
+GISEngine Workflow Designer - Professional FME-Style Interface
+Interface de création de workflows visuels professionnelle inspirée de FME
 """
 
 from PyQt5.QtCore import (
@@ -11,7 +11,7 @@ from PyQt5.QtCore import (
 )
 from PyQt5.QtGui import (
     QPen, QBrush, QColor, QFont, QPainter, QLinearGradient, QPainterPath,
-    QPixmap, QIcon, QDrag, QPalette, QFontMetrics, QKeySequence
+    QPixmap, QIcon, QDrag, QPalette, QFontMetrics, QKeySequence, QBitmap
 )
 from PyQt5.QtWidgets import (
     QGraphicsScene, QGraphicsView, QGraphicsItem, QGraphicsRectItem,
@@ -21,364 +21,1139 @@ from PyQt5.QtWidgets import (
     QCompleter, QListWidget, QListWidgetItem, QFrame, QPushButton,
     QScrollArea, QSplitter, QGroupBox, QCheckBox, QSlider, QSpinBox,
     QApplication, QGraphicsDropShadowEffect, QGraphicsProxyWidget,
-    QMainWindow, QShortcut, QMenu, QAction
+    QMainWindow, QShortcut, QMenu, QAction, QGraphicsPathItem
 )
-import random
+import sys
 import json
 from typing import List, Dict, Optional, Any
 
-# === DONNÉES DES NŒUDS STYLE FME ===
+# === PROFESSIONAL NODE DEFINITIONS ===
 
-WORKFLOW_NODES = {
+NODE_CATALOG = {
     "readers": [
-        {"name": "Shapefile Reader", "category": "Spatial Readers", "icon": "📁", "color": "#28a745", "keywords": ["shp", "shapefile", "esri"]},
-        {"name": "GeoJSON Reader", "category": "Spatial Readers", "icon": "🗺️", "color": "#28a745", "keywords": ["geojson", "json", "web"]},
-        {"name": "CSV Reader", "category": "Table Readers", "icon": "📊", "color": "#28a745", "keywords": ["csv", "table", "data"]},
-        {"name": "PostGIS Reader", "category": "Database Readers", "icon": "🗄️", "color": "#28a745", "keywords": ["postgis", "postgresql", "db"]},
-        {"name": "WFS Reader", "category": "Web Readers", "icon": "🌐", "color": "#28a745", "keywords": ["wfs", "web", "service"]},
+        {"name": "Shapefile Reader", "category": "Spatial Readers", "color": "#4CAF50", "description": "Read ESRI Shapefile data", "keywords": ["shp", "shapefile", "esri", "vector"]},
+        {"name": "GeoJSON Reader", "category": "Spatial Readers", "color": "#4CAF50", "description": "Read GeoJSON format files", "keywords": ["geojson", "json", "web", "vector"]},
+        {"name": "CSV Reader", "category": "Table Readers", "color": "#4CAF50", "description": "Read CSV tabular data", "keywords": ["csv", "table", "data", "text"]},
+        {"name": "PostGIS Reader", "category": "Database Readers", "color": "#4CAF50", "description": "Read from PostGIS database", "keywords": ["postgis", "postgresql", "db", "database"]},
+        {"name": "WFS Reader", "category": "Web Readers", "color": "#4CAF50", "description": "Web Feature Service reader", "keywords": ["wfs", "web", "service", "ogc"]},
+        {"name": "WMS Reader", "category": "Web Readers", "color": "#4CAF50", "description": "Web Map Service reader", "keywords": ["wms", "web", "raster", "ogc"]},
     ],
     "transformers": [
-        {"name": "Buffer", "category": "Vector Geometry", "icon": "⭕", "color": "#FF9800", "keywords": ["buffer", "zone", "distance"]},
-        {"name": "Clip", "category": "Vector Overlay", "icon": "✂️", "color": "#FF9800", "keywords": ["clip", "cut", "overlay"]},
-        {"name": "Dissolve", "category": "Vector Geometry", "icon": "🔗", "color": "#FF9800", "keywords": ["dissolve", "merge", "combine"]},
-        {"name": "Reproject", "category": "Coordinate System", "icon": "🌍", "color": "#FF9800", "keywords": ["reproject", "crs", "transform"]},
-        {"name": "Intersect", "category": "Vector Overlay", "icon": "⚡", "color": "#FF9800", "keywords": ["intersect", "overlap", "spatial"]},
-        {"name": "Join", "category": "Vector Table", "icon": "🔗", "color": "#FF9800", "keywords": ["join", "merge", "attribute"]},
-        {"name": "Filter", "category": "Data Processing", "icon": "🔍", "color": "#FF9800", "keywords": ["filter", "select", "where"]},
-        {"name": "Calculate Field", "category": "Attributes", "icon": "🧮", "color": "#FF9800", "keywords": ["calculate", "field", "expression"]},
+        {"name": "Buffer", "category": "Geometry", "color": "#FF9800", "description": "Create buffer zones around features", "keywords": ["buffer", "zone", "distance", "geometry"]},
+        {"name": "Clip", "category": "Overlay", "color": "#FF9800", "description": "Clip features by overlay", "keywords": ["clip", "cut", "overlay", "intersect"]},
+        {"name": "Dissolve", "category": "Geometry", "color": "#FF9800", "description": "Merge adjacent features", "keywords": ["dissolve", "merge", "combine", "union"]},
+        {"name": "Reproject", "category": "Coordinate System", "color": "#FF9800", "description": "Transform coordinate systems", "keywords": ["reproject", "crs", "transform", "coordinate"]},
+        {"name": "Intersect", "category": "Overlay", "color": "#FF9800", "description": "Find spatial intersections", "keywords": ["intersect", "overlap", "spatial", "overlay"]},
+        {"name": "Spatial Join", "category": "Analysis", "color": "#FF9800", "description": "Join attributes by location", "keywords": ["join", "spatial", "attribute", "location"]},
+        {"name": "Attribute Filter", "category": "Filter", "color": "#FF9800", "description": "Filter by attribute values", "keywords": ["filter", "select", "where", "attribute"]},
+        {"name": "Field Calculator", "category": "Attributes", "color": "#FF9800", "description": "Calculate field values", "keywords": ["calculate", "field", "expression", "attribute"]},
+        {"name": "Geometry Validator", "category": "Quality", "color": "#FF9800", "description": "Validate geometry integrity", "keywords": ["validate", "geometry", "quality", "check"]},
+        {"name": "Feature Merger", "category": "Transform", "color": "#FF9800", "description": "Merge feature attributes", "keywords": ["merge", "combine", "feature", "attribute"]},
     ],
     "writers": [
-        {"name": "Shapefile Writer", "category": "Spatial Writers", "icon": "💾", "color": "#2196F3", "keywords": ["shp", "shapefile", "esri"]},
-        {"name": "GeoJSON Writer", "category": "Spatial Writers", "icon": "📤", "color": "#2196F3", "keywords": ["geojson", "json", "web"]},
-        {"name": "CSV Writer", "category": "Table Writers", "icon": "📋", "color": "#2196F3", "keywords": ["csv", "table", "export"]},
-        {"name": "PostGIS Writer", "category": "Database Writers", "icon": "🗃️", "color": "#2196F3", "keywords": ["postgis", "postgresql", "db"]},
+        {"name": "Shapefile Writer", "category": "Spatial Writers", "color": "#2196F3", "description": "Write to ESRI Shapefile", "keywords": ["shp", "shapefile", "esri", "export"]},
+        {"name": "GeoJSON Writer", "category": "Spatial Writers", "color": "#2196F3", "description": "Write to GeoJSON format", "keywords": ["geojson", "json", "web", "export"]},
+        {"name": "CSV Writer", "category": "Table Writers", "color": "#2196F3", "description": "Write to CSV format", "keywords": ["csv", "table", "export", "text"]},
+        {"name": "PostGIS Writer", "category": "Database Writers", "color": "#2196F3", "description": "Write to PostGIS database", "keywords": ["postgis", "postgresql", "db", "database"]},
+        {"name": "GeoPackage Writer", "category": "Spatial Writers", "color": "#2196F3", "description": "Write to GeoPackage format", "keywords": ["gpkg", "geopackage", "sqlite", "ogc"]},
     ]
 }
 
-# === CLASSES MODERNES STYLE FME ===
+# === PROFESSIONAL FME-STYLE COMPONENTS ===
 
-class ModernWorkflowNode(QGraphicsRectItem):
-    """Nœud de workflow moderne style FME"""
+class FMEStyleNode(QGraphicsRectItem):
+    """Professional FME-style workflow node with modern design"""
     
     def __init__(self, node_data, x=0, y=0):
-        super().__init__(0, 0, 200, 80)
+        super().__init__(0, 0, 180, 60)
         self.setPos(x, y)
         self.node_data = node_data
         self.input_ports = []
         self.output_ports = []
-        self.is_selected = False
+        self.text_item = None
+        self.category_item = None
         
+        # Professional styling
+        self.base_color = QColor(node_data.get('color', '#6c757d'))
+        self.is_executing = False
+        
+        # Interaction flags
         self.setFlag(QGraphicsItem.ItemIsMovable, True)
         self.setFlag(QGraphicsItem.ItemIsSelectable, True)
         self.setFlag(QGraphicsItem.ItemSendsGeometryChanges, True)
+        self.setAcceptHoverEvents(True)
         
-        self.setup_appearance()
+        # Setup professional appearance
+        self.setup_professional_style()
         self.create_content()
         self.create_ports()
         
-    def setup_appearance(self):
-        """Style moderne avec dégradés"""
-        color = QColor(self.node_data["color"])
+        # Drop shadow for depth
+        shadow = QGraphicsDropShadowEffect()
+        shadow.setBlurRadius(8)
+        shadow.setColor(QColor(0, 0, 0, 60))
+        shadow.setOffset(2, 2)
+        self.setGraphicsEffect(shadow)
         
-        # Dégradé moderne
-        gradient = QLinearGradient(0, 0, 0, 80)
-        gradient.setColorAt(0, color.lighter(120))
-        gradient.setColorAt(1, color.darker(110))
+    def setup_professional_style(self):
+        """Setup professional FME-style appearance"""
+        # Clean, modern gradient
+        gradient = QLinearGradient(0, 0, 0, 60)
+        gradient.setColorAt(0, self.base_color.lighter(110))
+        gradient.setColorAt(0.5, self.base_color)
+        gradient.setColorAt(1, self.base_color.darker(110))
         
         self.setBrush(QBrush(gradient))
-        self.setPen(QPen(color.darker(150), 2))
+        
+        # Professional border
+        pen = QPen(self.base_color.darker(130), 1.5)
+        pen.setCapStyle(Qt.RoundCap)
+        pen.setJoinStyle(Qt.RoundJoin)
+        self.setPen(pen)
+        
+        # Rounded corners for modern look
+        self.setRect(QRectF(0, 0, 180, 60))
         
     def create_content(self):
-        """Contenu visuel du nœud"""
-        # Icône
-        self.icon_item = QGraphicsTextItem(self.node_data["icon"], self)
-        self.icon_item.setPos(8, 8)
-        self.icon_item.setFont(QFont("Arial", 14))
+        """Create professional node content without emojis"""
+        # Main title
+        self.text_item = QGraphicsTextItem(self.node_data['name'], self)
+        self.text_item.setPos(15, 8)
         
-        # Nom
-        self.name_item = QGraphicsTextItem(self.node_data["name"], self)
-        self.name_item.setPos(35, 5)
-        font = QFont("Arial", 10, QFont.Bold)
-        self.name_item.setFont(font)
-        self.name_item.setDefaultTextColor(QColor("white"))
+        # Professional typography
+        title_font = QFont("Segoe UI", 9, QFont.Bold)
+        self.text_item.setFont(title_font)
+        self.text_item.setDefaultTextColor(QColor("white"))
         
-        # Catégorie
-        self.category_item = QGraphicsTextItem(self.node_data["category"], self)
-        self.category_item.setPos(8, 45)
-        self.category_item.setFont(QFont("Arial", 8))
-        self.category_item.setDefaultTextColor(QColor("#f8f9fa"))
+        # Category subtitle
+        self.category_item = QGraphicsTextItem(self.node_data.get('category', ''), self)
+        self.category_item.setPos(15, 25)
+        category_font = QFont("Segoe UI", 7)
+        self.category_item.setFont(category_font)
+        self.category_item.setDefaultTextColor(QColor("#e0e0e0"))
+        
+        # Node type indicator (small colored rectangle)
+        type_indicator = QGraphicsRectItem(5, 8, 4, 20, self)
+        type_indicator.setBrush(QBrush(QColor("white")))
+        type_indicator.setPen(QPen(Qt.NoPen))
+        
+        # Adjust text width to fit node
+        self.text_item.setTextWidth(150)
+        self.category_item.setTextWidth(150)
         
     def create_ports(self):
-        """Créer les ports selon le type de nœud"""
-        node_name = self.node_data["name"].lower()
+        """Create professional connection ports"""
+        node_category = self.node_data.get('category', '')
+        port_size = 8
+        port_y = 26  # Centered vertically
         
-        # Readers : sortie seulement
-        if "reader" in node_name:
-            port = ConnectionPort(-7, 40, "output", "vector", self)
-            port.setParentItem(self)
-            self.output_ports.append(port)
-            
-        # Writers : entrée seulement
-        elif "writer" in node_name:
-            port = ConnectionPort(-7, 40, "input", "vector", self)
-            port.setParentItem(self)
-            self.input_ports.append(port)
-            
-        # Transformers : entrée et sortie
-        else:
-            in_port = ConnectionPort(-7, 40, "input", "vector", self)
-            in_port.setParentItem(self)
-            self.input_ports.append(in_port)
-            
-            out_port = ConnectionPort(193, 40, "output", "vector", self)
-            out_port.setParentItem(self)
-            self.output_ports.append(out_port)
+        # Input port (except for readers)
+        if 'Reader' not in node_category:
+            input_port = FMEStylePort(self, is_output=False)
+            input_port.setPos(-port_size//2, port_y)
+            self.input_ports.append(input_port)
+        
+        # Output port (except for writers)
+        if 'Writer' not in node_category:
+            output_port = FMEStylePort(self, is_output=True)
+            output_port.setPos(180 - port_size//2, port_y)
+            self.output_ports.append(output_port)
     
-    def mousePressEvent(self, event):
-        """Gestion de la sélection"""
-        if event.button() == Qt.LeftButton:
-            self.is_selected = True
-            self.update()
-        super().mousePressEvent(event)
-        
+    def hoverEnterEvent(self, event):
+        """Professional hover effect"""
+        # Subtle highlight on hover
+        pen = QPen(self.base_color.lighter(150), 2)
+        self.setPen(pen)
+        self.update()
+        super().hoverEnterEvent(event)
+    
+    def hoverLeaveEvent(self, event):
+        """Remove hover effect"""
+        pen = QPen(self.base_color.darker(130), 1.5)
+        self.setPen(pen)
+        self.update()
+        super().hoverLeaveEvent(event)
+    
     def mouseDoubleClickEvent(self, event):
-        """Double-clic pour configurer"""
+        """Open professional configuration dialog"""
         if event.button() == Qt.LeftButton:
             self.configure_node()
-            
+    
     def configure_node(self):
-        """Ouvre la configuration du nœud"""
-        from PyQt5.QtWidgets import QDialog, QVBoxLayout, QLabel, QPushButton
-        
-        dialog = QDialog()
-        dialog.setWindowTitle(f"Configuration - {self.node_data['name']}")
-        dialog.setFixedSize(300, 200)
-        
-        layout = QVBoxLayout()
-        layout.addWidget(QLabel(f"Nœud: {self.node_data['name']}"))
-        layout.addWidget(QLabel(f"Catégorie: {self.node_data['category']}"))
-        
-        close_btn = QPushButton("Fermer")
-        close_btn.clicked.connect(dialog.accept)
-        layout.addWidget(close_btn)
-        
-        dialog.setLayout(layout)
+        """Open professional node configuration dialog"""
+        dialog = NodeConfigDialog(self.node_data, parent=None)
         dialog.exec_()
+    
+    def start_execution_animation(self):
+        """Start professional execution animation"""
+        self.is_executing = True
+        
+        # Pulsing effect during execution
+        self.animation = QPropertyAnimation(self, b"opacity")
+        self.animation.setDuration(1000)
+        self.animation.setStartValue(1.0)
+        self.animation.setEndValue(0.7)
+        self.animation.setEasingCurve(QEasingCurve.InOutQuad)
+        self.animation.setLoopCount(-1)  # Infinite loop
+        self.animation.start()
+    
+    def stop_execution_animation(self):
+        """Stop execution animation"""
+        self.is_executing = False
+        if hasattr(self, 'animation'):
+            self.animation.stop()
+        self.setOpacity(1.0)
 
-class ModernWorkflowScene(QGraphicsScene):
-    """Scène moderne avec grille et interactions fluides"""
+
+class FMEStylePort(QGraphicsEllipseItem):
+    """Professional connection port for FME-style nodes"""
+    
+    def __init__(self, parent_node, is_output=False):
+        super().__init__(-4, -4, 8, 8, parent_node)
+        self.parent_node = parent_node
+        self.is_output = is_output
+        self.connections = []
+        
+        # Professional port styling
+        self.default_brush = QBrush(QColor("#ffffff"))
+        self.hover_brush = QBrush(QColor("#4A90E2"))
+        self.setBrush(self.default_brush)
+        
+        pen = QPen(QColor("#333333"), 1.5)
+        self.setPen(pen)
+        
+        self.setAcceptHoverEvents(True)
+        self.setZValue(10)  # Always on top
+    
+    def hoverEnterEvent(self, event):
+        """Professional hover effect for ports"""
+        self.setBrush(self.hover_brush)
+        super().hoverEnterEvent(event)
+    
+    def hoverLeaveEvent(self, event):
+        """Remove hover effect"""
+        self.setBrush(self.default_brush)
+        super().hoverLeaveEvent(event)
+    
+    def add_connection(self, connection):
+        """Add connection to this port"""
+        self.connections.append(connection)
+    
+    def remove_connection(self, connection):
+        """Remove connection from this port"""
+        if connection in self.connections:
+            self.connections.remove(connection)
+
+
+class FMEStyleConnection(QGraphicsPathItem):
+    """Professional curved connection line between ports"""
+    
+    def __init__(self, start_port, end_port):
+        super().__init__()
+        self.start_port = start_port
+        self.end_port = end_port
+        
+        # Professional connection styling
+        self.normal_pen = QPen(QColor("#4A90E2"), 2.5)
+        self.selected_pen = QPen(QColor("#FFA726"), 3.5)
+        self.normal_pen.setCapStyle(Qt.RoundCap)
+        self.selected_pen.setCapStyle(Qt.RoundCap)
+        
+        self.setPen(self.normal_pen)
+        self.setFlag(QGraphicsItem.ItemIsSelectable, True)
+        self.setZValue(1)
+        
+        # Add to ports
+        self.start_port.add_connection(self)
+        self.end_port.add_connection(self)
+        
+        self.update_path()
+    
+    def update_path(self):
+        """Create smooth, professional curved path"""
+        start_pos = self.start_port.scenePos()
+        end_pos = self.end_port.scenePos()
+        
+        path = QPainterPath()
+        path.moveTo(start_pos)
+        
+        # Calculate smooth curve control points
+        dx = end_pos.x() - start_pos.x()
+        dy = end_pos.y() - start_pos.y()
+        
+        # Adaptive curve strength based on distance
+        curve_strength = min(abs(dx) * 0.5, 100)
+        
+        control1 = QPointF(start_pos.x() + curve_strength, start_pos.y())
+        control2 = QPointF(end_pos.x() - curve_strength, end_pos.y())
+        
+        path.cubicTo(control1, control2, end_pos)
+        self.setPath(path)
+    
+    def paint(self, painter, option, widget=None):
+        """Professional rendering with selection highlight"""
+        if self.isSelected():
+            self.setPen(self.selected_pen)
+        else:
+            self.setPen(self.normal_pen)
+        
+        # Anti-aliasing for smooth curves
+        painter.setRenderHint(QPainter.Antialiasing)
+        super().paint(painter, option, widget)
+    
+    def delete(self):
+        """Clean removal of connection"""
+        self.start_port.remove_connection(self)
+        self.end_port.remove_connection(self)
+        if self.scene():
+            self.scene().removeItem(self)
+
+
+class NodeConfigDialog(QDialog):
+    """Professional node configuration dialog"""
+    
+    def __init__(self, node_data, parent=None):
+        super().__init__(parent)
+        self.node_data = node_data
+        self.setWindowTitle(f"Configure {node_data['name']}")
+        self.setModal(True)
+        self.resize(500, 400)
+        self.setup_ui()
+    
+    def setup_ui(self):
+        layout = QVBoxLayout(self)
+        
+        # Header with node info
+        header = QFrame()
+        header.setStyleSheet("background-color: #f8f9fa; border-radius: 8px; padding: 10px;")
+        header_layout = QVBoxLayout(header)
+        
+        title = QLabel(self.node_data['name'])
+        title.setFont(QFont("Segoe UI", 12, QFont.Bold))
+        header_layout.addWidget(title)
+        
+        description = QLabel(self.node_data.get('description', 'No description available'))
+        description.setFont(QFont("Segoe UI", 9))
+        description.setStyleSheet("color: #6c757d;")
+        header_layout.addWidget(description)
+        
+        layout.addWidget(header)
+        
+        # Configuration tabs
+        tabs = QTabWidget()
+        
+        # Parameters tab
+        params_tab = QWidget()
+        params_layout = QFormLayout(params_tab)
+        
+        # Add some common parameters
+        params_layout.addRow("Name:", QLineEdit(self.node_data['name']))
+        params_layout.addRow("Category:", QLineEdit(self.node_data.get('category', '')))
+        
+        tabs.addTab(params_tab, "Parameters")
+        
+        # Advanced tab placeholder
+        advanced_tab = QWidget()
+        tabs.addTab(advanced_tab, "Advanced")
+        
+        layout.addWidget(tabs)
+        
+        # Buttons
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+
+class FMEStyleScene(QGraphicsScene):
+    """Professional FME-style scene with grid and smooth interactions"""
     
     node_added = pyqtSignal(object)
     connection_created = pyqtSignal(object, object)
     
     def __init__(self):
         super().__init__()
-        self.setSceneRect(-2000, -2000, 4000, 3000)
-        self.grid_size = 20
+        self.setSceneRect(-3000, -3000, 6000, 6000)
+        self.grid_size = 25
         self.show_grid = True
         self.temp_connection = None
         self.connection_start_port = None
         
+        # Professional background color
+        self.background_color = QColor("#f8f9fa")
+        self.grid_color = QColor("#e9ecef")
+        
     def drawBackground(self, painter, rect):
-        """Dessine la grille de fond"""
+        """Draw professional grid background"""
+        # Clean background
+        painter.fillRect(rect, QBrush(self.background_color))
+        
         if not self.show_grid:
-            painter.fillRect(rect, QBrush(QColor("#2b2b2b")))
             return
             
-        # Fond sombre
-        painter.fillRect(rect, QBrush(QColor("#2b2b2b")))
+        # Professional grid lines
+        painter.setPen(QPen(self.grid_color, 0.5))
+        painter.setRenderHint(QPainter.Antialiasing, False)
         
-        # Grille
-        painter.setPen(QPen(QColor("#404040"), 1))
-        
-        # Lignes verticales
+        # Vertical grid lines
         start_x = int(rect.left() // self.grid_size) * self.grid_size
         while start_x < rect.right():
             painter.drawLine(start_x, rect.top(), start_x, rect.bottom())
             start_x += self.grid_size
             
-        # Lignes horizontales  
+        # Horizontal grid lines
         start_y = int(rect.top() // self.grid_size) * self.grid_size
         while start_y < rect.bottom():
             painter.drawLine(rect.left(), start_y, rect.right(), start_y)
             start_y += self.grid_size
             
     def add_node_from_data(self, node_data, position):
-        """Ajoute un nœud à partir des données"""
-        node = ModernWorkflowNode(node_data, position.x(), position.y())
+        """Add professional FME-style node from data"""
+        node = FMEStyleNode(node_data, position.x(), position.y())
         self.addItem(node)
         self.node_added.emit(node)
         return node
         
     def start_connection(self, port):
-        """Démarre la création d'une connexion"""
+        """Start creating a connection from port"""
         self.connection_start_port = port
         
     def mouseMoveEvent(self, event):
-        """Gestion du drag & drop et connexions temporaires"""
+        """Handle connection creation and dragging"""
         if self.connection_start_port:
-            # Dessiner ligne temporaire
+            # Remove old temporary connection
             if self.temp_connection:
                 self.removeItem(self.temp_connection)
                 
-            start_pos = self.connection_start_port.scenePos() + QPointF(7, 7)
+            # Create smooth temporary connection
+            start_pos = self.connection_start_port.scenePos()
             end_pos = event.scenePos()
             
-            self.temp_connection = QGraphicsLineItem(start_pos.x(), start_pos.y(), 
-                                                   end_pos.x(), end_pos.y())
-            self.temp_connection.setPen(QPen(QColor("#ffc107"), 2, Qt.DashLine))
+            path = QPainterPath()
+            path.moveTo(start_pos)
+            
+            # Smooth curve for temporary connection
+            dx = end_pos.x() - start_pos.x()
+            curve_strength = min(abs(dx) * 0.3, 80)
+            
+            control1 = QPointF(start_pos.x() + curve_strength, start_pos.y())
+            control2 = QPointF(end_pos.x() - curve_strength, end_pos.y())
+            path.cubicTo(control1, control2, end_pos)
+            
+            self.temp_connection = QGraphicsPathItem(path)
+            self.temp_connection.setPen(QPen(QColor("#FFA726"), 2.5, Qt.DashLine))
+            self.temp_connection.setZValue(5)
             self.addItem(self.temp_connection)
             
         super().mouseMoveEvent(event)
         
     def mouseReleaseEvent(self, event):
-        """Fin de création de connexion"""
+        """Complete connection creation"""
+        # Clean up temporary connection
         if self.temp_connection:
             self.removeItem(self.temp_connection)
             self.temp_connection = None
             
         if self.connection_start_port:
-            # Chercher un port de destination
+            # Find target port
             item = self.itemAt(event.scenePos(), QTransform())
-            if isinstance(item, ConnectionPort) and item != self.connection_start_port:
-                if self.connection_start_port.can_connect_to(item):
-                    connection = Connection(self.connection_start_port, item)
+            if isinstance(item, FMEStylePort) and item != self.connection_start_port:
+                # Check if connection is valid
+                if self.can_connect_ports(self.connection_start_port, item):
+                    connection = FMEStyleConnection(self.connection_start_port, item)
                     self.addItem(connection)
                     self.connection_created.emit(self.connection_start_port, item)
                     
             self.connection_start_port = None
             
         super().mouseReleaseEvent(event)
+    
+    def can_connect_ports(self, start_port, end_port):
+        """Check if two ports can be connected"""
+        # Can't connect output to output or input to input
+        if start_port.is_output == end_port.is_output:
+            return False
         
+        # Can't connect to same node
+        if start_port.parent_node == end_port.parent_node:
+            return False
+            
+        return True
+    
     def toggle_grid(self):
-        """Active/désactive la grille"""
+        """Toggle grid visibility"""
         self.show_grid = not self.show_grid
         self.update()
+    
+    def keyPressEvent(self, event):
+        """Handle keyboard shortcuts"""
+        if event.key() == Qt.Key_Delete:
+            # Delete selected items
+            selected_items = self.selectedItems()
+            for item in selected_items:
+                if isinstance(item, (FMEStyleNode, FMEStyleConnection)):
+                    if hasattr(item, 'delete'):
+                        item.delete()
+                    else:
+                        self.removeItem(item)
+        
+        super().keyPressEvent(event)
 
-class NodeSearchPanel(QWidget):
-    """Panneau de recherche et sélection de nœuds avec auto-complétion"""
+
+class ProfessionalSearchPanel(QWidget):
+    """Professional search panel with keyboard autocompletion for FME-style components"""
     
     node_requested = pyqtSignal(dict)
     
     def __init__(self):
         super().__init__()
-        self.init_ui()
-        self.setup_search()
+        self.all_nodes = self.flatten_node_catalog()
+        self.filtered_nodes = self.all_nodes.copy()
+        self.setup_ui()
+        self.setup_autocompletion()
+    
+    def flatten_node_catalog(self):
+        """Flatten node catalog for search"""
+        nodes = []
+        for category, node_list in NODE_CATALOG.items():
+            for node in node_list:
+                node_copy = node.copy()
+                node_copy['type'] = category  # Add type info
+                nodes.append(node_copy)
+        return nodes
         
-    def init_ui(self):
-        """Interface du panneau"""
-        layout = QVBoxLayout()
+    def setup_ui(self):
+        """Setup professional search interface"""
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(15, 15, 15, 15)
+        layout.setSpacing(10)
         
-        # Titre
-        title = QLabel("📚 Node Library")
-        title.setFont(QFont("Arial", 12, QFont.Bold))
-        title.setStyleSheet("color: white; padding: 10px;")
-        layout.addWidget(title)
-        
-        # Barre de recherche
-        self.search_box = QLineEdit()
-        self.search_box.setPlaceholderText("🔍 Search nodes...")
-        self.search_box.setStyleSheet("""
-            QLineEdit {
-                padding: 8px;
-                border: 2px solid #404040;
-                border-radius: 6px;
-                background: #3b3b3b;
-                color: white;
-                font-size: 11px;
-            }
-            QLineEdit:focus {
-                border-color: #ffc107;
+        # Professional header
+        header = QFrame()
+        header.setStyleSheet("""
+            QFrame {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                border-radius: 8px;
+                padding: 12px;
             }
         """)
-        layout.addWidget(self.search_box)
+        header_layout = QVBoxLayout(header)
         
-        # Liste des nœuds
+        title = QLabel("Component Library")
+        title.setFont(QFont("Segoe UI", 13, QFont.Bold))
+        title.setStyleSheet("color: white; margin: 0;")
+        header_layout.addWidget(title)
+        
+        subtitle = QLabel("Readers • Transformers • Writers")
+        subtitle.setFont(QFont("Segoe UI", 9))
+        subtitle.setStyleSheet("color: rgba(255,255,255,0.8); margin: 0;")
+        header_layout.addWidget(subtitle)
+        
+        layout.addWidget(header)
+        
+        # Professional search box with autocompletion
+        search_container = QFrame()
+        search_container.setStyleSheet("""
+            QFrame {
+                background: white;
+                border: 2px solid #e9ecef;
+                border-radius: 8px;
+            }
+            QFrame:focus-within {
+                border-color: #4A90E2;
+            }
+        """)
+        search_layout = QHBoxLayout(search_container)
+        search_layout.setContentsMargins(12, 8, 12, 8)
+        
+        self.search_box = QLineEdit()
+        self.search_box.setPlaceholderText("Type to search components... (e.g. buffer, csv, postgis)")
+        self.search_box.setStyleSheet("""
+            QLineEdit {
+                border: none;
+                font-size: 11px;
+                font-family: 'Segoe UI';
+                color: #333;
+                padding: 4px;
+            }
+        """)
+        search_layout.addWidget(self.search_box)
+        
+        layout.addWidget(search_container)
+        
+        # Professional components list
         self.node_list = QListWidget()
         self.node_list.setStyleSheet("""
             QListWidget {
-                border: 1px solid #404040;
-                background: #3b3b3b;
-                color: white;
-                border-radius: 6px;
+                border: 1px solid #e9ecef;
+                background: white;
+                border-radius: 8px;
+                outline: none;
             }
             QListWidget::item {
-                padding: 8px;
-                border-bottom: 1px solid #404040;
+                padding: 12px;
+                border-bottom: 1px solid #f8f9fa;
+                color: #333;
+                font-family: 'Segoe UI';
+                font-size: 10px;
             }
             QListWidget::item:hover {
-                background: #4b4b4b;
+                background: #f8f9fa;
             }
             QListWidget::item:selected {
-                background: #ffc107;
-                color: black;
+                background: #4A90E2;
+                color: white;
+                border-radius: 4px;
+                margin: 2px;
             }
         """)
         layout.addWidget(self.node_list)
         
-        self.setLayout(layout)
-        self.setFixedWidth(280)
-        self.setStyleSheet("background: #2b2b2b;")
+        # Quick add buttons
+        quick_buttons = QFrame()
+        quick_layout = QHBoxLayout(quick_buttons)
+        quick_layout.setContentsMargins(0, 0, 0, 0)
         
-    def setup_search(self):
-        """Configure la recherche et l'auto-complétion"""
-        # Créer la liste de tous les nœuds
-        self.all_nodes = []
-        for category, nodes in WORKFLOW_NODES.items():
-            self.all_nodes.extend(nodes)
-            
-        # Remplir la liste initiale
+        for category in ['readers', 'transformers', 'writers']:
+            btn = QPushButton(category.title())
+            btn.setStyleSheet("""
+                QPushButton {
+                    background: #f8f9fa;
+                    border: 1px solid #dee2e6;
+                    border-radius: 4px;
+                    padding: 6px 12px;
+                    font-size: 9px;
+                    font-weight: bold;
+                    color: #495057;
+                }
+                QPushButton:hover {
+                    background: #e9ecef;
+                }
+            """)
+            btn.clicked.connect(lambda checked, cat=category: self.filter_by_category(cat))
+            quick_layout.addWidget(btn)
+        
+        layout.addWidget(quick_buttons)
+        
+        self.setFixedWidth(320)
+        self.setStyleSheet("background: white;")
+        
+    def setup_autocompletion(self):
+        """Setup professional autocompletion with keyboard shortcuts"""
+        # Populate initial list
         self.populate_list(self.all_nodes)
         
-        # Connecter la recherche
+        # Connect search functionality
         self.search_box.textChanged.connect(self.filter_nodes)
         self.node_list.itemDoubleClicked.connect(self.on_node_selected)
+        self.node_list.itemClicked.connect(self.on_node_selected)
         
-        # Drag & Drop
+        # Professional autocompletion
+        node_names = [node['name'] for node in self.all_nodes]
+        node_keywords = []
+        for node in self.all_nodes:
+            node_keywords.extend(node.get('keywords', []))
+        
+        completer_items = list(set(node_names + node_keywords))
+        completer = QCompleter(completer_items)
+        completer.setCaseSensitivity(Qt.CaseInsensitive)
+        completer.setFilterMode(Qt.MatchContains)
+        self.search_box.setCompleter(completer)
+        
+        # Keyboard shortcuts for quick access
+        self.search_box.installEventFilter(self)
+        
+        # Enable drag and drop
         self.node_list.setDragDropMode(QListWidget.DragOnly)
+    
+    def eventFilter(self, obj, event):
+        """Handle keyboard shortcuts for quick component access"""
+        if obj == self.search_box and event.type() == QEvent.KeyPress:
+            if event.key() == Qt.Key_Return or event.key() == Qt.Key_Enter:
+                # Auto-add first filtered result on Enter
+                if self.node_list.count() > 0:
+                    self.on_node_selected(self.node_list.item(0))
+                    self.search_box.clear()
+                return True
+        return super().eventFilter(obj, event)
         
     def populate_list(self, nodes):
-        """Remplit la liste avec les nœuds"""
+        """Populate list with professional node items"""
         self.node_list.clear()
         
+        # Group by category for better organization
+        categories = {}
         for node in nodes:
-            item = QListWidgetItem(f"{node['icon']} {node['name']}")
-            item.setData(Qt.UserRole, node)
+            cat = node.get('type', 'unknown')
+            if cat not in categories:
+                categories[cat] = []
+            categories[cat].append(node)
+        
+        for category, node_list in categories.items():
+            # Category header
+            if len(categories) > 1:  # Only show headers if multiple categories
+                header_item = QListWidgetItem(f"▼ {category.upper()}")
+                header_item.setFont(QFont("Segoe UI", 9, QFont.Bold))
+                header_item.setBackground(QBrush(QColor("#f8f9fa")))
+                header_item.setFlags(Qt.NoItemFlags)  # Not selectable
+                self.node_list.addItem(header_item)
             
-            # Couleur selon le type
-            color = QColor(node['color'])
-            item.setBackground(QBrush(color.darker(300)))
-            
-            self.node_list.addItem(item)
+            # Add nodes in this category
+            for node in sorted(node_list, key=lambda x: x['name']):
+                item_text = f"{node['name']}"
+                if node.get('description'):
+                    item_text += f"\n{node['description']}"
+                
+                item = QListWidgetItem(item_text)
+                item.setData(Qt.UserRole, node)
+                
+                # Color coding by category
+                color = QColor(node['color'])
+                item.setData(Qt.BackgroundRole, QBrush(color.lighter(180)))
+                
+                self.node_list.addItem(item)
             
     def filter_nodes(self, text):
-        """Filtre les nœuds selon la recherche"""
-        if not text:
-            self.populate_list(self.all_nodes)
+        """Professional fuzzy search with relevance scoring"""
+        if not text.strip():
+            self.filtered_nodes = self.all_nodes.copy()
+            self.populate_list(self.filtered_nodes)
             return
             
-        text = text.lower()
-        filtered = []
+        text = text.lower().strip()
+        scored_nodes = []
         
         for node in self.all_nodes:
-            # Recherche dans nom, catégorie et mots-clés
-            searchable = [
-                node['name'].lower(),
-                node['category'].lower(),
-            ] + [kw.lower() for kw in node.get('keywords', [])]
+            score = 0
             
-            if any(text in field for field in searchable):
-                filtered.append(node)
-                
+            # Score exact matches higher
+            name_lower = node['name'].lower()
+            if text == name_lower:
+                score += 100
+            elif text in name_lower:
+                score += 50
+            
+            # Score category matches
+            if text in node['category'].lower():
+                score += 30
+            
+            # Score keyword matches
+            for keyword in node.get('keywords', []):
+                if text in keyword.lower():
+                    score += 20
+                    
+            # Score description matches
+            if text in node.get('description', '').lower():
+                score += 10
+            
+            if score > 0:
+                scored_nodes.append((node, score))
+        
+        # Sort by relevance score
+        scored_nodes.sort(key=lambda x: x[1], reverse=True)
+        self.filtered_nodes = [node for node, score in scored_nodes]
+        
+        self.populate_list(self.filtered_nodes)
+    
+    def filter_by_category(self, category):
+        """Filter nodes by category"""
+        filtered = [node for node in self.all_nodes if node.get('type') == category]
+        self.filtered_nodes = filtered
         self.populate_list(filtered)
+        self.search_box.clear()
+        self.search_box.setPlaceholderText(f"Search in {category}...")
         
     def on_node_selected(self, item):
-        """Nœud sélectionné pour ajout"""
+        """Professional node selection with immediate feedback"""
+        if item is None or item.data(Qt.UserRole) is None:
+            return
+            
         node_data = item.data(Qt.UserRole)
         self.node_requested.emit(node_data)
+        
+        # Visual feedback
+        item.setSelected(True)
+        QTimer.singleShot(200, lambda: item.setSelected(False))
 
+class FMEWorkflowDesigner(QMainWindow):
+    """Professional FME-style workflow designer with modern interface"""
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("GIS Engine - Workflow Designer")
+        self.setGeometry(100, 100, 1400, 900)
+        
+        # Professional styling
+        self.setStyleSheet("""
+            QMainWindow {
+                background: #f8f9fa;
+            }
+            QMenuBar {
+                background: white;
+                border-bottom: 1px solid #dee2e6;
+                padding: 4px;
+                font-family: 'Segoe UI';
+            }
+            QMenuBar::item {
+                padding: 6px 12px;
+                border-radius: 4px;
+            }
+            QMenuBar::item:selected {
+                background: #e9ecef;
+            }
+            QToolBar {
+                background: white;
+                border: none;
+                spacing: 8px;
+                padding: 8px;
+            }
+            QStatusBar {
+                background: white;
+                border-top: 1px solid #dee2e6;
+                color: #6c757d;
+            }
+        """)
+        
+        self.setup_ui()
+        self.setup_connections()
+        
+    def setup_ui(self):
+        """Setup the professional interface layout"""
+        # Central widget with splitter
+        central_widget = QWidget()
+        self.setCentralWidget(central_widget)
+        
+        # Main layout
+        main_layout = QHBoxLayout(central_widget)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
+        
+        # Create splitter for resizable panels
+        splitter = QSplitter(Qt.Horizontal)
+        
+        # Search panel
+        self.search_panel = ProfessionalSearchPanel()
+        splitter.addWidget(self.search_panel)
+        
+        # Main workflow area
+        workflow_container = QFrame()
+        workflow_container.setStyleSheet("""
+            QFrame {
+                background: white;
+                border: 1px solid #dee2e6;
+                border-radius: 8px;
+                margin: 8px;
+            }
+        """)
+        
+        workflow_layout = QVBoxLayout(workflow_container)
+        workflow_layout.setContentsMargins(0, 0, 0, 0)
+        
+        # Workflow header with tools
+        header = self.create_workflow_header()
+        workflow_layout.addWidget(header)
+        
+        # Graphics view for workflow canvas
+        self.scene = FMEStyleScene()
+        self.view = QGraphicsView(self.scene)
+        self.view.setStyleSheet("""
+            QGraphicsView {
+                border: none;
+                background: #f8f9fa;
+            }
+        """)
+        self.view.setRenderHint(QPainter.Antialiasing)
+        self.view.setDragMode(QGraphicsView.RubberBandDrag)
+        self.view.setRubberBandSelectionMode(Qt.ContainsItemBoundingRect)
+        
+        workflow_layout.addWidget(self.view)
+        
+        splitter.addWidget(workflow_container)
+        
+        # Properties panel (initially hidden)
+        self.properties_panel = self.create_properties_panel()
+        splitter.addWidget(self.properties_panel)
+        
+        # Set splitter proportions
+        splitter.setSizes([320, 800, 280])
+        splitter.setCollapsible(0, False)  # Search panel not collapsible
+        splitter.setCollapsible(2, True)   # Properties panel collapsible
+        
+        main_layout.addWidget(splitter)
+        
+        # Create menu and toolbar
+        self.create_menus()
+        self.create_toolbar()
+        self.create_statusbar()
+    
+    def create_workflow_header(self):
+        """Create professional workflow header with tools"""
+        header = QFrame()
+        header.setFixedHeight(50)
+        header.setStyleSheet("""
+            QFrame {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                border-radius: 8px 8px 0px 0px;
+            }
+        """)
+        
+        layout = QHBoxLayout(header)
+        layout.setContentsMargins(15, 10, 15, 10)
+        
+        # Title
+        title = QLabel("Workflow Canvas")
+        title.setStyleSheet("""
+            color: white;
+            font-family: 'Segoe UI';
+            font-size: 14px;
+            font-weight: bold;
+        """)
+        layout.addWidget(title)
+        
+        layout.addStretch()
+        
+        # Action buttons
+        buttons_data = [
+            ("Run", "#28a745", self.run_workflow),
+            ("Save", "#17a2b8", self.save_workflow),
+            ("Clear", "#dc3545", self.clear_workflow)
+        ]
+        
+        for text, color, callback in buttons_data:
+            btn = QPushButton(text)
+            btn.setStyleSheet(f"""
+                QPushButton {{
+                    background: {color};
+                    color: white;
+                    border: none;
+                    border-radius: 4px;
+                    padding: 6px 16px;
+                    font-weight: bold;
+                    font-size: 10px;
+                }}
+                QPushButton:hover {{
+                    background: {color}dd;
+                }}
+                QPushButton:pressed {{
+                    background: {color}bb;
+                }}
+            """)
+            btn.clicked.connect(callback)
+            layout.addWidget(btn)
+        
+        return header
+    
+    def create_properties_panel(self):
+        """Create properties panel for node configuration"""
+        panel = QFrame()
+        panel.setStyleSheet("""
+            QFrame {
+                background: white;
+                border: 1px solid #dee2e6;
+                border-radius: 8px;
+                margin: 8px;
+            }
+        """)
+        
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(15, 15, 15, 15)
+        
+        # Header
+        header = QLabel("Properties")
+        header.setFont(QFont("Segoe UI", 12, QFont.Bold))
+        header.setStyleSheet("color: #495057; margin-bottom: 10px;")
+        layout.addWidget(header)
+        
+        # Properties content
+        self.properties_content = QLabel("Select a component to view properties")
+        self.properties_content.setStyleSheet("""
+            color: #6c757d;
+            font-style: italic;
+            padding: 20px;
+        """)
+        self.properties_content.setAlignment(Qt.AlignCenter)
+        layout.addWidget(self.properties_content)
+        
+        layout.addStretch()
+        
+        panel.setFixedWidth(280)
+        panel.hide()  # Initially hidden
+        
+        return panel
+    
+    def create_menus(self):
+        """Create professional menu bar"""
+        menubar = self.menuBar()
+        
+        # File menu
+        file_menu = menubar.addMenu('File')
+        file_menu.addAction('New Workflow', self.new_workflow, 'Ctrl+N')
+        file_menu.addAction('Open Workflow', self.open_workflow, 'Ctrl+O')
+        file_menu.addSeparator()
+        file_menu.addAction('Save Workflow', self.save_workflow, 'Ctrl+S')
+        file_menu.addAction('Save As...', self.save_workflow_as, 'Ctrl+Shift+S')
+        file_menu.addSeparator()
+        file_menu.addAction('Export', self.export_workflow)
+        
+        # Edit menu
+        edit_menu = menubar.addMenu('Edit')
+        edit_menu.addAction('Undo', self.undo_action, 'Ctrl+Z')
+        edit_menu.addAction('Redo', self.redo_action, 'Ctrl+Y')
+        edit_menu.addSeparator()
+        edit_menu.addAction('Copy', self.copy_selection, 'Ctrl+C')
+        edit_menu.addAction('Paste', self.paste_selection, 'Ctrl+V')
+        edit_menu.addAction('Delete', self.delete_selection, 'Delete')
+        
+        # View menu
+        view_menu = menubar.addMenu('View')
+        view_menu.addAction('Zoom In', self.zoom_in, 'Ctrl++')
+        view_menu.addAction('Zoom Out', self.zoom_out, 'Ctrl+-')
+        view_menu.addAction('Fit to Window', self.fit_to_window, 'Ctrl+0')
+        view_menu.addSeparator()
+        view_menu.addAction('Toggle Grid', self.scene.toggle_grid, 'Ctrl+G')
+        view_menu.addAction('Toggle Properties', self.toggle_properties, 'F4')
+    
+    def create_toolbar(self):
+        """Create professional toolbar"""
+        toolbar = self.addToolBar('Main')
+        toolbar.setMovable(False)
+        
+        # Add common actions
+        toolbar.addAction('New', self.new_workflow)
+        toolbar.addAction('Open', self.open_workflow)
+        toolbar.addAction('Save', self.save_workflow)
+        toolbar.addSeparator()
+        toolbar.addAction('Run', self.run_workflow)
+        toolbar.addAction('Stop', self.stop_workflow)
+        toolbar.addSeparator()
+        toolbar.addAction('Zoom In', self.zoom_in)
+        toolbar.addAction('Zoom Out', self.zoom_out)
+        toolbar.addAction('Fit', self.fit_to_window)
+    
+    def create_statusbar(self):
+        """Create professional status bar"""
+        statusbar = self.statusBar()
+        statusbar.showMessage("Ready - Click and drag components from the library to start building your workflow")
+    
+    def setup_connections(self):
+        """Setup signal connections"""
+        # Search panel connections
+        self.search_panel.node_requested.connect(self.add_node_to_scene)
+    
+    def add_node_to_scene(self, node_data):
+        """Add a node to the workflow scene"""
+        # Get center position of the view
+        center = self.view.mapToScene(self.view.rect().center())
+        
+        # Add some randomization to avoid overlapping
+        import random
+        center.setX(center.x() + random.randint(-50, 50))
+        center.setY(center.y() + random.randint(-50, 50))
+        
+        # Create and add the node
+        node = self.scene.add_node_from_data(node_data, center)
+        
+        # Update status
+        self.statusBar().showMessage(f"Added {node_data['name']} to workflow")
+    
+    # Workflow actions
+    def new_workflow(self):
+        """Create new workflow"""
+        self.scene.clear()
+        self.statusBar().showMessage("New workflow created")
+    
+    def open_workflow(self):
+        """Open existing workflow"""
+        # TODO: Implement workflow loading
+        self.statusBar().showMessage("Open workflow - Not implemented yet")
+    
+    def save_workflow(self):
+        """Save current workflow"""
+        # TODO: Implement workflow saving
+        self.statusBar().showMessage("Workflow saved")
+    
+    def save_workflow_as(self):
+        """Save workflow with new name"""
+        # TODO: Implement save as
+        self.statusBar().showMessage("Save as - Not implemented yet")
+    
+    def export_workflow(self):
+        """Export workflow"""
+        # TODO: Implement export
+        self.statusBar().showMessage("Export - Not implemented yet")
+    
+    def run_workflow(self):
+        """Run the workflow"""
+        self.statusBar().showMessage("Running workflow...")
+        # TODO: Implement workflow execution
+        QTimer.singleShot(2000, lambda: self.statusBar().showMessage("Workflow completed"))
+    
+    def stop_workflow(self):
+        """Stop workflow execution"""
+        self.statusBar().showMessage("Workflow stopped")
+    
+    def clear_workflow(self):
+        """Clear the workflow"""
+        reply = QMessageBox.question(self, 'Clear Workflow', 
+                                   'Are you sure you want to clear the entire workflow?',
+                                   QMessageBox.Yes | QMessageBox.No, 
+                                   QMessageBox.No)
+        if reply == QMessageBox.Yes:
+            self.scene.clear()
+            self.statusBar().showMessage("Workflow cleared")
+    
+    # Edit actions
+    def undo_action(self):
+        """Undo last action"""
+        self.statusBar().showMessage("Undo - Not implemented yet")
+    
+    def redo_action(self):
+        """Redo last action"""
+        self.statusBar().showMessage("Redo - Not implemented yet")
+    
+    def copy_selection(self):
+        """Copy selected items"""
+        self.statusBar().showMessage("Copy - Not implemented yet")
+    
+    def paste_selection(self):
+        """Paste copied items"""
+        self.statusBar().showMessage("Paste - Not implemented yet")
+    
+    def delete_selection(self):
+        """Delete selected items"""
+        selected_items = self.scene.selectedItems()
+        if selected_items:
+            for item in selected_items:
+                if hasattr(item, 'delete'):
+                    item.delete()
+                else:
+                    self.scene.removeItem(item)
+            self.statusBar().showMessage(f"Deleted {len(selected_items)} item(s)")
+    
+    # View actions
+    def zoom_in(self):
+        """Zoom in the view"""
+        self.view.scale(1.25, 1.25)
+    
+    def zoom_out(self):
+        """Zoom out the view"""
+        self.view.scale(0.8, 0.8)
+    
+    def fit_to_window(self):
+        """Fit workflow to window"""
+        self.view.fitInView(self.scene.itemsBoundingRect(), Qt.KeepAspectRatio)
+    
+    def toggle_properties(self):
+        """Toggle properties panel visibility"""
+        if self.properties_panel.isVisible():
+            self.properties_panel.hide()
+        else:
+            self.properties_panel.show()
+
+
+# For backward compatibility with existing code
 class ConnectionPort(QGraphicsEllipseItem):
-    """Port de connexion amélioré pour les transformers"""
+    """Legacy connection port class"""
     
     def __init__(self, x, y, port_type="input", data_type="vector", parent_node=None):
         super().__init__(0, 0, 14, 14)

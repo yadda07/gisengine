@@ -23,12 +23,24 @@ from PyQt5.QtGui import (
 # Import des composants
 try:
     from .qgis_plugin_ui import QGISPluginUI
-    from .qgis_integration import QGISProcessingIntegration
-    print("✅ Tous les composants importés avec succès")
+    print("✅ QGISPluginUI importé")
 except ImportError as e:
-    print(f"❌ Erreur import composants: {e}")
+    print(f"❌ Erreur import QGISPluginUI: {e}")
     QGISPluginUI = None
+
+try:
+    from .qgis_integration import QGISProcessingIntegration
+    print("✅ QGISProcessingIntegration importé")
+except ImportError as e:
+    print(f"❌ Erreur import QGISProcessingIntegration: {e}")
     QGISProcessingIntegration = None
+
+try:
+    from .workflow import FMEWorkflowDesigner
+    print("✅ FMEWorkflowDesigner importé avec succès")
+except ImportError as e:
+    print(f"❌ Erreur import FMEWorkflowDesigner: {e}")
+    FMEWorkflowDesigner = None
 
 # === Classes du Workflow ===
 
@@ -567,6 +579,9 @@ class UnifiedGISENGINEInterface(QMainWindow):
         # Barre d'outils
         self.create_toolbar()
         
+        # Debug des imports
+        print(f"[DEBUG] Status imports - QGISPluginUI: {QGISPluginUI is not None}, QGISProcessingIntegration: {QGISProcessingIntegration is not None}, FMEWorkflowDesigner: {FMEWorkflowDesigner is not None}")
+        
         # Widget central avec onglets
         self.create_main_interface()
         
@@ -887,15 +902,40 @@ class UnifiedGISENGINEInterface(QMainWindow):
                     item.setHidden(not visible)
     
     def setup_workflow_tab(self):
-        """Configure l'onglet du workflow designer avec drag and drop"""
+        """Configure l'onglet du workflow designer avec le nouveau FME Designer"""
         try:
-            # Créer directement le widget workflow interactif
-            workflow_widget = self.create_interactive_workflow_widget()
-            self.tabs.addTab(workflow_widget, "📊 Workflow Designer")
+            # Utiliser le nouveau FMEWorkflowDesigner professionnel
+            print(f"[DEBUG] FMEWorkflowDesigner disponible: {FMEWorkflowDesigner is not None}")
+            if FMEWorkflowDesigner:
+                print("[DEBUG] Création du FMEWorkflowDesigner...")
+                # Créer le nouveau workflow designer professionnel
+                self.workflow_designer = FMEWorkflowDesigner()
+                print("[DEBUG] FMEWorkflowDesigner créé avec succès")
+                
+                # L'intégrer comme widget central sans barre de menu/outils
+                workflow_widget = QWidget()
+                layout = QVBoxLayout()
+                layout.setContentsMargins(0, 0, 0, 0)
+                
+                # Ajouter juste le contenu central du workflow designer
+                central_widget = self.workflow_designer.centralWidget()
+                layout.addWidget(central_widget)
+                
+                workflow_widget.setLayout(layout)
+                self.tabs.addTab(workflow_widget, "Workflow Designer")
+                print("[DEBUG] Onglet Workflow Designer ajouté avec succès")
+            else:
+                print("[DEBUG] FMEWorkflowDesigner non disponible, utilisation du fallback")
+                # Fallback vers l'ancien système si import échoue
+                workflow_widget = self.create_interactive_workflow_widget()
+                self.tabs.addTab(workflow_widget, "Workflow Designer")
                 
         except Exception as e:
+            print(f"[ERROR] Erreur workflow designer: {e}")
+            import traceback
+            traceback.print_exc()
             error_widget = self.create_error_widget(f"Erreur workflow: {str(e)}")
-            self.tabs.addTab(error_widget, "📊 Workflow (Erreur)")
+            self.tabs.addTab(error_widget, "Workflow Designer (Erreur)")
     
     def get_transformers_data_for_scene(self):
         """Retourne les données des transformers pour la scène."""
@@ -1435,6 +1475,8 @@ class UnifiedGISENGINEInterface(QMainWindow):
     def new_workflow(self):
         """Nouveau workflow"""
         self.tabs.setCurrentIndex(1)  # Aller à l'onglet workflow
+        if hasattr(self, 'workflow_designer') and self.workflow_designer:
+            self.workflow_designer.new_workflow()
         self.status_message.setText("Nouveau workflow créé")
     
     def open_workflow(self):
@@ -1444,23 +1486,31 @@ class UnifiedGISENGINEInterface(QMainWindow):
     
     def save_workflow(self):
         """Sauvegarder le workflow"""
-        self.status_message.setText("Workflow sauvegardé")
+        if hasattr(self, 'workflow_designer') and self.workflow_designer:
+            self.workflow_designer.save_workflow()
+        else:
+            self.status_message.setText("Workflow sauvegardé")
     
     def validate_workflow(self):
         """Valider le workflow"""
         self.tabs.setCurrentIndex(1)
-        self.status_message.setText("Validation du workflow en cours...")
-        
-        # Simulation de validation
-        QTimer.singleShot(1000, lambda: self.status_message.setText("✅ Workflow validé"))
+        if hasattr(self, 'workflow_designer') and self.workflow_designer:
+            # Le workflow designer gère sa propre validation
+            self.status_message.setText("Validation du workflow...")
+        else:
+            self.status_message.setText("Validation du workflow en cours...")
+            # Simulation de validation
+            QTimer.singleShot(1000, lambda: self.status_message.setText("✅ Workflow validé"))
     
     def execute_workflow(self):
         """Exécuter le workflow"""
         self.tabs.setCurrentIndex(1)
-        self.status_message.setText("Exécution du workflow en cours...")
-        
-        # Simulation d'exécution
-        QTimer.singleShot(2000, lambda: self.status_message.setText("✅ Workflow exécuté"))
+        if hasattr(self, 'workflow_designer') and self.workflow_designer:
+            self.workflow_designer.run_workflow()
+        else:
+            self.status_message.setText("Exécution du workflow en cours...")
+            # Simulation d'exécution
+            QTimer.singleShot(2000, lambda: self.status_message.setText("✅ Workflow exécuté"))
     
     def show_about(self):
         """Affiche les informations"""
