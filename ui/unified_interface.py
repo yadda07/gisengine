@@ -36,7 +36,7 @@ except ImportError as e:
     QGISProcessingIntegration = None
 
 try:
-    from .workflow import FMEWorkflowDesigner
+    from ..workflow import WorkflowDesigner as FMEWorkflowDesigner
     print("✅ FMEWorkflowDesigner importé avec succès")
 except ImportError as e:
     print(f"❌ Erreur import FMEWorkflowDesigner: {e}")

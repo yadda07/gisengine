@@ -4,9 +4,16 @@ Professional Search Panel
 FME-style search with autocompletion
 """
 
-from PyQt5.QtWidgets import *
-from PyQt5.QtCore import *
-from PyQt5.QtGui import *
+try:
+    # QGIS environment
+    from qgis.PyQt.QtWidgets import *
+    from qgis.PyQt.QtCore import *
+    from qgis.PyQt.QtGui import *
+except ImportError:
+    # Fallback for development environment
+    from PyQt5.QtWidgets import *
+    from PyQt5.QtCore import *
+    from PyQt5.QtGui import *
 
 class ProfessionalSearchPanel(QWidget):
     """Panneau de recherche professionnel avec autocomplétion"""
@@ -266,3 +273,132 @@ class ProfessionalSearchPanel(QWidget):
                 self.results_list.setCurrentRow(0)
         
         super().keyPressEvent(event)
+
+
+class PropertiesPanel(QWidget):
+    """Professional properties panel for selected workflow components"""
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setup_ui()
+        self.current_node = None
+    
+    def setup_ui(self):
+        """Setup the properties panel interface"""
+        self.setStyleSheet("""
+            QWidget {
+                background: white;
+                border: 1px solid #dee2e6;
+                border-radius: 8px;
+                font-family: 'Segoe UI';
+            }
+            QLabel {
+                color: #495057;
+                border: none;
+            }
+            QLineEdit, QTextEdit {
+                border: 1px solid #ced4da;
+                border-radius: 4px;
+                padding: 6px;
+                background: white;
+            }
+            QLineEdit:focus, QTextEdit:focus {
+                border-color: #007bff;
+            }
+        """)
+        
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(15, 15, 15, 15)
+        layout.setSpacing(12)
+        
+        # Header
+        header = QLabel("Properties")
+        header.setFont(QFont("Segoe UI", 12, QFont.Bold))
+        header.setStyleSheet("color: #495057; margin-bottom: 10px;")
+        layout.addWidget(header)
+        
+        # Content area
+        self.content_widget = QWidget()
+        self.content_layout = QVBoxLayout(self.content_widget)
+        layout.addWidget(self.content_widget)
+        
+        # Default message
+        self.default_message = QLabel("Select a component to view properties")
+        self.default_message.setStyleSheet("""
+            color: #6c757d;
+            font-style: italic;
+            padding: 20px;
+        """)
+        self.default_message.setAlignment(Qt.AlignCenter)
+        self.content_layout.addWidget(self.default_message)
+        
+        # Stretch to push content to top
+        layout.addStretch()
+    
+    def show_node_properties(self, node):
+        """Display properties for the selected node"""
+        self.current_node = node
+        
+        # Clear existing content
+        self.clear_content()
+        
+        if not node or not hasattr(node, 'node_data'):
+            self.show_default_message()
+            return
+        
+        node_data = node.node_data
+        
+        # Node name
+        name_label = QLabel("Name:")
+        name_label.setFont(QFont("Segoe UI", 9, QFont.Bold))
+        self.content_layout.addWidget(name_label)
+        
+        self.name_edit = QLineEdit(node_data.get('name', ''))
+        self.name_edit.textChanged.connect(self.update_node_name)
+        self.content_layout.addWidget(self.name_edit)
+        
+        # Node type
+        type_label = QLabel("Type:")
+        type_label.setFont(QFont("Segoe UI", 9, QFont.Bold))
+        self.content_layout.addWidget(type_label)
+        
+        type_value = QLabel(node_data.get('type', 'Unknown'))
+        type_value.setStyleSheet("color: #6c757d; font-style: italic;")
+        self.content_layout.addWidget(type_value)
+        
+        # Description
+        desc_label = QLabel("Description:")
+        desc_label.setFont(QFont("Segoe UI", 9, QFont.Bold))
+        self.content_layout.addWidget(desc_label)
+        
+        desc_value = QLabel(node_data.get('description', 'No description available'))
+        desc_value.setWordWrap(True)
+        desc_value.setStyleSheet("color: #6c757d;")
+        self.content_layout.addWidget(desc_value)
+        
+        # Category
+        cat_label = QLabel("Category:")
+        cat_label.setFont(QFont("Segoe UI", 9, QFont.Bold))
+        self.content_layout.addWidget(cat_label)
+        
+        cat_value = QLabel(node_data.get('category', 'General'))
+        cat_value.setStyleSheet("color: #6c757d; font-style: italic;")
+        self.content_layout.addWidget(cat_value)
+    
+    def clear_content(self):
+        """Clear all content from the properties panel"""
+        while self.content_layout.count():
+            child = self.content_layout.takeAt(0)
+            if child.widget():
+                child.widget().deleteLater()
+    
+    def show_default_message(self):
+        """Show the default 'select a component' message"""
+        self.content_layout.addWidget(self.default_message)
+    
+    def update_node_name(self, new_name):
+        """Update the node name when changed in properties"""
+        if self.current_node and hasattr(self.current_node, 'node_data'):
+            self.current_node.node_data['name'] = new_name
+            if hasattr(self.current_node, 'label'):
+                self.current_node.label.setPlainText(new_name)

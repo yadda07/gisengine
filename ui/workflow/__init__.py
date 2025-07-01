@@ -1,17 +1,39 @@
-# -*- coding: utf-8 -*-
 """
-Workflow Designer Components
-Professional FME-style workflow designer
+Professional Workflow Designer Module
+Enterprise-grade workflow canvas and components for GISENGINE
+
+Architecture:
+- canvas: Core workflow canvas with grid and interaction handling
+- components: Node and connection components
+- panels: UI panels (search, properties, etc.)
+- designer: Main workflow designer window
 """
 
-from .workflow_designer import FMEWorkflowDesigner
-from .workflow_scene import FMEStyleScene
-from .workflow_nodes import ProfessionalWorkflowNode
-from .search_panel import ProfessionalSearchPanel
+# Core canvas
+from .canvas import ProfessionalWorkflowCanvas
+
+# Components
+from .components import (
+    ProfessionalWorkflowNode,
+    ConnectionPort,
+    Connection
+)
+
+# UI Panels
+from .panels import (
+    ProfessionalSearchPanel,
+    PropertiesPanel
+)
+
+# Main designer
+from .designer import ProfessionalWorkflowDesigner
 
 __all__ = [
-    'FMEWorkflowDesigner',
-    'FMEStyleScene', 
+    'ProfessionalWorkflowCanvas',
     'ProfessionalWorkflowNode',
-    'ProfessionalSearchPanel'
+    'ConnectionPort', 
+    'Connection',
+    'ProfessionalSearchPanel',
+    'PropertiesPanel',
+    'ProfessionalWorkflowDesigner'
 ]

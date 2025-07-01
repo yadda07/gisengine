@@ -4,17 +4,22 @@ FME Workflow Designer
 Main professional workflow designer window
 """
 
-from PyQt5.QtWidgets import *
-from PyQt5.QtCore import *
-from PyQt5.QtGui import *
+try:
+    from qgis.PyQt.QtWidgets import *
+    from qgis.PyQt.QtCore import *
+    from qgis.PyQt.QtGui import *
+except ImportError:
+    from PyQt5.QtWidgets import *
+    from PyQt5.QtCore import *
+    from PyQt5.QtGui import *
 import json
 import os
 
-from .workflow_scene import FMEStyleScene
-from .search_panel import ProfessionalSearchPanel
+from .canvas import ProfessionalWorkflowCanvas
+from .panels import ProfessionalSearchPanel, PropertiesPanel
 
-class FMEWorkflowDesigner(QMainWindow):
-    """Professional FME-style workflow designer with modern interface"""
+class ProfessionalWorkflowDesigner(QMainWindow):
+    """Professional workflow designer with modern interface"""
     
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -75,7 +80,7 @@ class FMEWorkflowDesigner(QMainWindow):
     
     def setup_scene_and_view(self):
         """Configuration de la scène et de la vue"""
-        self.scene = FMEStyleScene()
+        self.scene = ProfessionalWorkflowCanvas()
         
         self.view = QGraphicsView(self.scene)
         self.view.setRenderHint(QPainter.Antialiasing)
@@ -97,45 +102,9 @@ class FMEWorkflowDesigner(QMainWindow):
         self.search_panel = ProfessionalSearchPanel()
         
         # Panneau de propriétés
-        self.properties_panel = self.create_properties_panel()
+        self.properties_panel = PropertiesPanel()
     
-    def create_properties_panel(self):
-        """Créer le panneau de propriétés professionnel"""
-        panel = QWidget()
-        panel.setStyleSheet("""
-            QWidget {
-                background: white;
-                border: 1px solid #dee2e6;
-                border-radius: 8px;
-                margin: 8px;
-            }
-        """)
-        
-        layout = QVBoxLayout(panel)
-        layout.setContentsMargins(15, 15, 15, 15)
-        
-        # Header
-        header = QLabel("Properties")
-        header.setFont(QFont("Segoe UI", 12, QFont.Bold))
-        header.setStyleSheet("color: #495057; margin-bottom: 10px;")
-        layout.addWidget(header)
-        
-        # Properties content
-        self.properties_content = QLabel("Select a component to view properties")
-        self.properties_content.setStyleSheet("""
-            color: #6c757d;
-            font-style: italic;
-            padding: 20px;
-        """)
-        self.properties_content.setAlignment(Qt.AlignCenter)
-        layout.addWidget(self.properties_content)
-        
-        layout.addStretch()
-        
-        panel.setFixedWidth(280)
-        panel.hide()  # Initially hidden
-        
-        return panel
+
     
     def setup_layout(self):
         """Configuration du layout principal"""

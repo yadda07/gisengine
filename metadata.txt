@@ -1,23 +1,22 @@
 [general]
 name=GISENGINE
 qgisMinimumVersion=3.28
-description=Plugin QGIS offrant une interface moderne pour chaîner des traitements géomatiques avec les algorithmes Processing existants
-version=0.1.0
-author=Youcef
-email=yadda@ext.nge.fr
+description=Modern workflow designer for QGIS with modular components
+version=1.0.0
+author=GISENGINE Team
+email=contact@gisengine.org
 
-about=GISENGINE est un plugin qui offre une interface moderne et intuitive pour chaîner des traitements géomatiques dans QGIS. Il s'appuie sur les algorithmes du Processing Framework existants et propose un système de workflow graphique avec mapping attributaire intelligent.
+about=GISENGINE provides a modern, modular approach to geospatial workflows in QGIS. Create visual workflows with reusable components including readers, transformers, and writers. Built with plugin architecture for community contributions.
 
-tracker=https://github.com/votre-repo/gisengine-plugin/issues
-repository=https://github.com/votre-repo/gisengine-plugin
+tracker=https://github.com/yadda07/gisengine/issues
+repository=https://github.com/yadda07/gisengine
 hasProcessingProvider=no
-changelog=Version 0.1.0 - Interface prototype - Scanner algorithmes Processing - Workflow mapper avec connexions graphiques - Système de mapping attributaire
+changelog=Version 1.0.0 - Initial modular architecture with core components
 
-tags=processing,workflow,automation,geoprocessing,transformer
+tags=workflow,processing,automation,modular,architecture
 
-homepage=https://github.com/votre-repo/gisengine-plugin
+homepage=https://github.com/yadda07/gisengine
 category=Analysis
 experimental=True
-
 deprecated=False
 server=False

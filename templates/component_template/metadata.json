@@ -1,0 +1,89 @@
+{
+  "name": "MyComponentTemplate",
+  "display_name": "Mon Composant Template",
+  "description": "Template pour créer un nouveau composant GISENGINE",
+  "version": "1.0.0",
+  "author": "Votre Nom",
+  "email": "votre.email@example.com",
+  "category": "template",
+  "subcategory": "example",
+  "tags": ["template", "example", "starter"],
+  
+  "component_type": "transformer",
+  "input_types": ["vector"],
+  "output_types": ["vector"],
+  
+  "parameters": {
+    "input_layer": {
+      "type": "vector_layer",
+      "required": true,
+      "description": "Couche vectorielle d'entrée"
+    },
+    "buffer_distance": {
+      "type": "number",
+      "required": true,
+      "default": 100.0,
+      "min": 0.1,
+      "description": "Distance du tampon en unités de la couche"
+    },
+    "output_name": {
+      "type": "string",
+      "required": false,
+      "default": "result",
+      "description": "Nom de la couche de sortie"
+    }
+  },
+  
+  "outputs": {
+    "output_layer": {
+      "type": "vector_layer",
+      "description": "Couche vectorielle résultat"
+    }
+  },
+  
+  "ui_config": {
+    "icon": "template.svg",
+    "color": "#4A90E2",
+    "group": "Templates",
+    "advanced_parameters": ["output_name"],
+    "parameter_order": ["input_layer", "buffer_distance", "output_name"]
+  },
+  
+  "requirements": {
+    "qgis_minimum_version": "3.16",
+    "python_packages": [],
+    "system_dependencies": []
+  },
+  
+  "documentation": {
+    "help_url": "https://github.com/your-repo/gisengine/docs/components/template",
+    "examples": [
+      {
+        "title": "Exemple basique",
+        "description": "Utilisation simple du template",
+        "parameters": {
+          "input_layer": "ma_couche.shp",
+          "buffer_distance": 50.0
+        }
+      }
+    ]
+  },
+  
+  "testing": {
+    "test_data": "test_data/sample_layer.shp",
+    "expected_outputs": ["output_layer"],
+    "performance_benchmarks": {
+      "small_dataset": "< 1s",
+      "medium_dataset": "< 10s",
+      "large_dataset": "< 60s"
+    }
+  },
+  
+  "changelog": [
+    {
+      "version": "1.0.0",
+      "date": "2024-01-01",
+      "changes": ["Version initiale du template"]
+    }
+  ]
+}

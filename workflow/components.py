@@ -4,9 +4,21 @@ Professional Workflow Nodes
 FME-style nodes with modern design
 """
 
-from PyQt5.QtWidgets import *
-from PyQt5.QtCore import *
-from PyQt5.QtGui import *
+try:
+    # QGIS environment
+    from qgis.PyQt.QtWidgets import *
+    from qgis.PyQt.QtCore import *
+    from qgis.PyQt.QtGui import *
+except ImportError:
+    try:
+        # Fallback for development environment
+        from qgis.PyQt.QtWidgets import *
+        from qgis.PyQt.QtCore import *
+        from qgis.PyQt.QtGui import *
+    except ImportError:
+        from PyQt5.QtWidgets import *
+        from PyQt5.QtCore import *
+        from PyQt5.QtGui import *
 import math
 
 class ConnectionPort(QGraphicsEllipseItem):

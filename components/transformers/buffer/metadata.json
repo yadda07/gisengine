@@ -1,0 +1,16 @@
+{
+  "id": "core.buffer",
+  "name": "Buffer",
+  "description": "Create buffer zones around vector features",
+  "category": "Geometry",
+  "type": "transformer",
+  "version": "1.0.0",
+  "author": "GISENGINE Core Team",
+  "license": "MIT",
+  "tags": [
+    "buffer",
+    "geometry",
+    "zones",
+    "distance"
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "id": "core.file_reader",
+  "name": "File Reader",
+  "description": "Read vector and raster files from disk",
+  "category": "Input/Output",
+  "type": "reader",
+  "version": "1.0.0",
+  "author": "GISENGINE Core Team",
+  "license": "MIT",
+  "tags": [
+    "file",
+    "input",
+    "vector",
+    "raster",
+    "shapefile",
+    "geojson"
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "id": "core.file_writer",
+  "name": "File Writer",
+  "description": "Write vector and raster layers to files",
+  "category": "Input/Output",
+  "type": "writer",
+  "version": "1.0.0",
+  "author": "GISENGINE Core Team",
+  "license": "MIT",
+  "tags": [
+    "file",
+    "output",
+    "export",
+    "save"
+  ]
+}
